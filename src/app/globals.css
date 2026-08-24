@@ -180,6 +180,10 @@ button { cursor: pointer; }
 
 .panel, .level-card, .score-card, .rule-card, .detail-card {
   background: #fff; border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow-card);
+  /* การ์ดพวกนี้มักเป็นลูกของ display:grid/flex (level-grid, detail-grid, rules-grid) และบางใบ
+     มีตารางเลื่อนแนวนอน (scroll-x) อยู่ข้างใน — ถ้าไม่ตั้ง min-width:0 ตัวการ์ดจะไม่ยอมหด
+     ตามคอลัมน์ ดันทั้งแถวกว้างเกินจอบนมือถือ (บั๊กคลาสสิกของ grid/flex item) */
+  min-width: 0;
 }
 .panel { padding: 24px; }
 .stack { display: grid; gap: 14px; }
@@ -290,6 +294,16 @@ button { cursor: pointer; }
 .bracket-tree-row span { overflow-wrap: anywhere; }
 .bracket-tree-row.win { font-weight: 800; background: #fff6d9; }
 .bracket-tree-row b { flex: none; }
+
+/*
+ * ตัวห่อ section ของหน้าสายการแข่งขัน — ใช้ display:grid เรียง section แนวตั้ง
+ * บั๊กคลาสสิกของ CSS Grid: grid item ที่ไม่ได้ตั้ง min-width จะไม่ยอมหดเล็กกว่าความกว้าง
+ * เนื้อหาข้างในตามธรรมชาติ (min-content) แม้เนื้อหานั้นจะเลื่อนแนวนอนได้เองอยู่แล้ว (bracket-tree-scroll)
+ * ผลคือทั้งหน้าถูกดันกว้างเกินจอ ทำให้ทุกอย่างเลื่อนซ้าย-ขวาไปด้วยกันและดูพังบนมือถือ
+ * ตั้ง min-width: 0 ให้ grid item หดได้ตามจอ แล้วปล่อยให้ bracket-tree-scroll จัดการสกอร์ลเองแทน
+ */
+.bracket-page-stack { display: grid; gap: 34px; min-width: 0; }
+.bracket-page-stack > section { min-width: 0; }
 
 .group-card { padding: 18px; }
 .group-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -413,4 +427,8 @@ footer.site-footer a { color: #cfe0f4; }
   .inline-heading { align-items: flex-start; gap: 10px; flex-direction: column; }
   .detail-card { padding: 16px; }
   .team-tie { padding: 12px; }
+  .bracket-tree-columns { gap: 28px; }
+  .bracket-tree-col { width: 200px; }
+  .bracket-tree-card { padding: 8px; }
+  .bracket-tree-row { padding: 6px 8px; font-size: 12px; }
 }

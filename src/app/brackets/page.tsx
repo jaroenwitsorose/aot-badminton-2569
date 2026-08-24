@@ -81,7 +81,7 @@ function Level1Bracket() {
   const { snapshot } = useSnapshot();
 
   return (
-    <div style={{ display: "grid", gap: 34 }}>
+    <div className="bracket-page-stack">
       {(["MD", "WD", "XD"] as const).map((ev) => {
         const matches = snapshot.matches.filter((m) => m.levelCode === "LEVEL1" && m.eventType === ev);
         if (matches.length === 0) return null;
@@ -139,7 +139,7 @@ function GroupLevel({ levelCode }: { levelCode: string }) {
   const koMatches = snapshot.matches.filter((m) => m.levelCode === levelCode && m.phase === "KNOCKOUT");
 
   return (
-    <div style={{ display: "grid", gap: 34 }}>
+    <div className="bracket-page-stack">
       <section>
         <SectionHeading
           title="รอบแบ่งกลุ่ม"
@@ -271,7 +271,7 @@ function Level4View() {
   const ranked = snapshot.level4Standings.some((r) => r.rank !== null);
 
   return (
-    <div style={{ display: "grid", gap: 34 }}>
+    <div className="bracket-page-stack">
       <section>
         <SectionHeading
           title="อันดับสีรอบพบกันหมด"
