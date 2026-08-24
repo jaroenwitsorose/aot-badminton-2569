@@ -40,7 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <span style={{ color: "var(--muted)" }}>
               {session.displayName} · {ROLE_TH[session.role]}
             </span>
-            <LogoutButton />
+            {isAuthDisabled() ? null : <LogoutButton />}
           </div>
         ) : null}
       </div>
