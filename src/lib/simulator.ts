@@ -237,60 +237,72 @@ export async function simulateAllResults(actorId: string): Promise<SimulationOut
   void pairByUid;
 
   // ── 3. เขียนลงฐานข้อมูลครั้งเดียว ───────────────────────────
+  //
+  // เดิมโค้ดนี้ลูปทีละแมตช์ (deleteMany + createMany + update ต่อแมตช์ = ได้ query ~470
+  // ครั้งใน transaction เดียว) ซึ่งเกิน timeout เริ่มต้นของ Prisma interactive transaction
+  // (5 วินาที) เกือบทุกครั้งเมื่อรันข้าม region จริง (Vercel -> Neon) ทำให้ "จำลองผลไม่ได้"
+  // แก้โดยรวมเป็น query เดียวต่อชนิดการเขียน (payload ของทุกแมตช์ที่แก้เหมือนกันหมด
+  // จึงใช้ updateMany ได้ ไม่จำเป็นต้อง update ทีละแถว)
   const now = new Date();
-  await prisma.$transaction(async (tx) => {
-    if (newDraws.length > 0) {
-      await tx.drawAssignment.createMany({
-        data: newDraws.map((d) => {
-          const parts = d.token.split(":");
-          return {
-            token: d.token,
-            levelCode: LEVEL_OF_SHORT[parts[1]],
-            groupKey: parts[0] === "GROUP" ? parts[2] : null,
-            slotNo: parts[0] === "GROUP" ? Number(parts[3].replace("SLOT", "")) : Number(parts[3]),
-            pairUid: d.pairUid,
-            assignedBy: actorId,
-          };
-        }),
-      });
-    }
-    if (newLineups.length > 0) {
-      await tx.level4Lineup.createMany({ data: newLineups });
-    }
-
-    for (const uid of touchedMatches) {
-      const m = matchByUid.get(uid)!;
-      await tx.matchGame.deleteMany({ where: { matchUid: uid } });
-      await tx.matchGame.createMany({
-        data: m.games.map((g) => ({ matchUid: uid, gameNo: g.gameNo, scoreA: g.scoreA, scoreB: g.scoreB })),
-      });
-      await tx.match.update({
-        where: { matchUid: uid },
-        data: {
-          status: "COMPLETED",
-          walkover: false,
-          walkoverSide: null,
-          publicUpdatedAt: now,
-          updatedById: actorId,
-          adminNote: "ผลจากโหมดจำลอง — ต้องล้างก่อนแข่งจริง",
-        },
-      });
-    }
-
-    await tx.auditLog.create({
-      data: {
-        actorId,
-        action: "SIMULATION_RUN",
-        entityType: "tournament",
-        entityId: "ALL",
-        afterJson: {
-          matchesFilled: touchedMatches.size,
-          drawsCreated: newDraws.length,
-          lineupsCreated: newLineups.length,
-        },
-      },
-    });
+  const touchedIds = [...touchedMatches];
+  const allGameRows = touchedIds.flatMap((uid) => {
+    const m = matchByUid.get(uid)!;
+    return m.games.map((g) => ({ matchUid: uid, gameNo: g.gameNo, scoreA: g.scoreA, scoreB: g.scoreB }));
   });
+
+  await prisma.$transaction(
+    async (tx) => {
+      if (newDraws.length > 0) {
+        await tx.drawAssignment.createMany({
+          data: newDraws.map((d) => {
+            const parts = d.token.split(":");
+            return {
+              token: d.token,
+              levelCode: LEVEL_OF_SHORT[parts[1]],
+              groupKey: parts[0] === "GROUP" ? parts[2] : null,
+              slotNo: parts[0] === "GROUP" ? Number(parts[3].replace("SLOT", "")) : Number(parts[3]),
+              pairUid: d.pairUid,
+              assignedBy: actorId,
+            };
+          }),
+        });
+      }
+      if (newLineups.length > 0) {
+        await tx.level4Lineup.createMany({ data: newLineups });
+      }
+
+      if (touchedIds.length > 0) {
+        await tx.matchGame.deleteMany({ where: { matchUid: { in: touchedIds } } });
+        await tx.matchGame.createMany({ data: allGameRows });
+        await tx.match.updateMany({
+          where: { matchUid: { in: touchedIds } },
+          data: {
+            status: "COMPLETED",
+            walkover: false,
+            walkoverSide: null,
+            publicUpdatedAt: now,
+            updatedById: actorId,
+            adminNote: "ผลจากโหมดจำลอง — ต้องล้างก่อนแข่งจริง",
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: "SIMULATION_RUN",
+          entityType: "tournament",
+          entityId: "ALL",
+          afterJson: {
+            matchesFilled: touchedMatches.size,
+            drawsCreated: newDraws.length,
+            lineupsCreated: newLineups.length,
+          },
+        },
+      });
+    },
+    { timeout: 30000, maxWait: 10000 },
+  );
 
   return {
     matchesFilled: touchedMatches.size,

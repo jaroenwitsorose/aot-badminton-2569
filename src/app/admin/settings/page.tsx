@@ -4,6 +4,8 @@ import { SettingsForm } from "./settings-form";
 import { SystemFlags } from "./system-flags";
 
 export const dynamic = "force-dynamic";
+// จำลองผลครบ 158 แมตช์ทำงานผ่าน server action บนหน้านี้ — ให้เวลาเผื่อไว้มากกว่าปกติ
+export const maxDuration = 30;
 
 export default async function SettingsPage() {
   const session = await requirePage("ADMIN");
