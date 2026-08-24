@@ -272,7 +272,7 @@ async function main(): Promise<void> {
         mustChangePassword: true,
       },
     });
-    console.log(`  สร้างบัญชี SUPERADMIN "${username}" แล้ว (บังคับเปลี่ยนรหัสผ่านเมื่อเข้าครั้งแรก)`);
+    console.log(`  สร้างบัญชี SUPERADMIN "${username}" แล้ว (แนะนำให้เปลี่ยนรหัสผ่านหลังเข้าใช้ครั้งแรก)`);
   }
 
   const counts = {

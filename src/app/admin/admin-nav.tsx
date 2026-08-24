@@ -13,6 +13,7 @@ const LINKS: { href: string; label: string; min: Role }[] = [
   { href: "/admin/settings", label: "ตั้งค่าและซ้อมระบบ", min: "ADMIN" },
   { href: "/admin/audit", label: "ประวัติการแก้ไข", min: "ADMIN" },
   { href: "/admin/users", label: "บัญชีผู้ดูแล", min: "SUPERADMIN" },
+  { href: "/admin/password", label: "เปลี่ยนรหัสผ่าน", min: "SCORER" },
 ];
 
 export function AdminNav({ role }: { role: Role }) {

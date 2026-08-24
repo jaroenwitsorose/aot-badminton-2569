@@ -5,12 +5,12 @@ import { ROLE_RANK, type Role } from "./roles";
 
 /**
  * ใช้บนหน้า Admin ทุกหน้า: ยังไม่ล็อกอินให้เด้งไปหน้าเข้าสู่ระบบ
- * และถ้ายังไม่เปลี่ยนรหัสผ่านครั้งแรก ให้บังคับเปลี่ยนก่อนใช้งาน
+ *
+ * ไม่บังคับเปลี่ยนรหัสผ่าน — ผู้ใช้เปลี่ยนเองได้ที่เมนู "เปลี่ยนรหัสผ่าน" เมื่อต้องการ
  */
 export async function requirePage(minimum: Role = "SCORER"): Promise<Session> {
   const session = await getSession();
   if (!session) redirect("/admin/login");
-  if (session.mustChangePassword) redirect("/admin/password");
   if (ROLE_RANK[session.role] < ROLE_RANK[minimum]) redirect("/admin?denied=1");
   return session;
 }

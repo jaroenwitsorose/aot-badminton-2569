@@ -53,7 +53,7 @@ cp .env.example .env
   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
   ```
 - `SEED_SUPERADMIN_USERNAME` / `SEED_SUPERADMIN_PASSWORD` — บัญชีหัวหน้าผู้ดูแลคนแรก
-  (ระบบจะบังคับเปลี่ยนรหัสผ่านเมื่อเข้าครั้งแรก)
+  (เปลี่ยนรหัสผ่านได้เองที่เมนู "เปลี่ยนรหัสผ่าน" ในระบบผู้ดูแล — แนะนำให้เปลี่ยนหลังเข้าครั้งแรก)
 
 ### 2. ติดตั้งและนำเข้าข้อมูล
 

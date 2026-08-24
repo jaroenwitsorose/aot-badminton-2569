@@ -65,7 +65,7 @@ export function UserManager({ users, currentAdminId }: { users: UserRow[]; curre
                   {u.displayName}
                   {u.mustChangePassword ? (
                     <span className="ml-2 text-[11px]" style={{ color: "#b45309" }}>
-                      ยังไม่เปลี่ยนรหัสผ่านแรกเข้า
+                      ยังใช้รหัสผ่านแรกเข้า
                     </span>
                   ) : null}
                 </td>
@@ -130,7 +130,7 @@ export function UserManager({ users, currentAdminId }: { users: UserRow[]; curre
           </label>
         </div>
         <p className="m-0 text-[12px]" style={{ color: "var(--muted)" }}>
-          อย่างน้อย 12 ตัวอักษร มีพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข · ผู้ใช้ต้องเปลี่ยนรหัสผ่านเมื่อเข้าครั้งแรก
+          อย่างน้อย 12 ตัวอักษร มีพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข · แนะนำให้ผู้ใช้เปลี่ยนรหัสผ่านเองหลังเข้าครั้งแรก
         </p>
 
         {state ? (

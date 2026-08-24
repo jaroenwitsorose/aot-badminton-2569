@@ -40,7 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         ) : null}
       </div>
 
-      {session && !session.mustChangePassword ? <AdminNav role={session.role} /> : null}
+      {session ? <AdminNav role={session.role} /> : null}
 
       <div style={{ marginTop: 18 }}>{children}</div>
     </main>

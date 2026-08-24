@@ -60,7 +60,7 @@ async function guarded(fn: () => Promise<ActionResult>): Promise<ActionResult> {
 }
 
 function refreshPublicPages(): void {
-  for (const p of ["/", "/schedule", "/results", "/brackets", "/standings", "/teams", "/admin"]) {
+  for (const p of ["/", "/schedule", "/results", "/brackets", "/scores", "/teams", "/rules", "/admin"]) {
     revalidatePath(p);
   }
 }
@@ -86,7 +86,8 @@ export async function loginAction(_prev: ActionResult | null, formData: FormData
     entityId: session.adminId,
     ...(await meta()),
   });
-  redirect(session.mustChangePassword ? "/admin/password" : "/admin");
+  // เข้าหน้าภาพรวมเสมอ — การเปลี่ยนรหัสผ่านเป็นเรื่องที่ผู้ใช้เลือกทำเองที่เมนู
+  redirect("/admin");
 }
 
 export async function logoutAction(): Promise<void> {
@@ -829,7 +830,7 @@ export async function createAdminUserAction(
     });
 
     revalidatePath("/admin/users");
-    return ok(`สร้างบัญชี ${username} แล้ว (ต้องเปลี่ยนรหัสผ่านเมื่อเข้าครั้งแรก)`);
+    return ok(`สร้างบัญชี ${username} แล้ว — แจ้งให้เจ้าตัวเปลี่ยนรหัสผ่านเองที่เมนูเปลี่ยนรหัสผ่าน`);
   });
 }
 
