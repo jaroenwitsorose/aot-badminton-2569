@@ -19,6 +19,35 @@ export type { Role };
 const COOKIE_NAME = "aot_badminton_session";
 const SESSION_HOURS = 12;
 
+/**
+ * โหมดปิดการล็อกอินชั่วคราว (ใช้ระหว่างพัฒนา/ทดสอบให้ระบบนิ่งก่อน)
+ *
+ * เปิดใช้โดยตั้ง env `ADMIN_AUTH_DISABLED=true` เท่านั้น — ค่าเริ่มต้นคือ "เปิดล็อกอินตามปกติ"
+ * ระหว่างปิด ทุกคนที่เข้าถึง /admin ได้จะมีสิทธิ์ระดับหัวหน้าผู้ดูแลทันที
+ *
+ * ⚠️ ต้องลบ env นี้ออกก่อนกรอกรายชื่อนักกีฬาจริงและก่อนเปิดใช้งานวันแข่ง
+ */
+export function isAuthDisabled(): boolean {
+  return process.env.ADMIN_AUTH_DISABLED === "true";
+}
+
+/** บัญชีที่ใช้แทนตัวตนระหว่างปิดล็อกอิน — ต้องมีอยู่จริงในฐานข้อมูล เพราะ audit log อ้างถึง */
+async function fallbackAdminSession(): Promise<Session | null> {
+  const user =
+    (await prisma.adminUser.findFirst({
+      where: { active: true, role: "SUPERADMIN" },
+      orderBy: { adminId: "asc" },
+    })) ?? (await prisma.adminUser.findFirst({ where: { active: true }, orderBy: { adminId: "asc" } }));
+  if (!user) return null;
+  return {
+    adminId: user.adminId,
+    username: user.username,
+    displayName: user.displayName,
+    role: user.role as Role,
+    mustChangePassword: user.mustChangePassword,
+  };
+}
+
 export interface Session {
   adminId: string;
   username: string;
@@ -58,6 +87,9 @@ export async function destroySession(): Promise<void> {
 }
 
 export async function getSession(): Promise<Session | null> {
+  // ปิดล็อกอินชั่วคราว: ให้สิทธิ์หัวหน้าผู้ดูแลโดยไม่ต้องมี cookie
+  if (isAuthDisabled()) return fallbackAdminSession();
+
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;

@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth";
+import { getSession, isAuthDisabled } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ROLE_TH } from "@/lib/labels";
 import { AdminNav } from "./admin-nav";
@@ -12,6 +12,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <main className="admin-shell shell">
+      {isAuthDisabled() ? (
+        <div className="admin-banner danger">
+          ปิดระบบล็อกอินชั่วคราว — ต้องเปิดกลับก่อนกรอกรายชื่อจริงและก่อนวันแข่ง
+        </div>
+      ) : null}
       {tournament?.publicAdminTestMode ? (
         <div className="admin-banner danger">
           เปิด Public Admin Test Mode อยู่ — ต้องปิดก่อนเปิดใช้งานจริง
