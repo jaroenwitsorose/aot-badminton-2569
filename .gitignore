@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+.env
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
+*.log
+
+# ชุดโค้ดอ้างอิงที่นำ UI มาใช้ ไม่ใช่ส่วนหนึ่งของแอป
+New folder/

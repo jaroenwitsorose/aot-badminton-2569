@@ -1,0 +1,477 @@
+// ระบบการแข่งขันแบดมินตัน กีฬาภายใน ทอท. ประจำปี 2569
+// ชื่อฟิลด์อ้างอิงจากชีต Data_Dictionary ของ AOT_Badminton_2569_Production_Data.xlsx
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── enums ─────────────────────────
+
+enum EventType {
+  MD // ชายคู่
+  WD // หญิงคู่
+  XD // คู่ผสม
+}
+
+enum MatchStatus {
+  WAITING // รอแข่งขัน
+  CALLED // เรียกลงคอร์ต
+  PLAYING // กำลังแข่งขัน
+  COMPLETED // จบแล้ว
+  WALKOVER // ชนะบาย
+  CANCELLED // ยกเลิก
+}
+
+enum Phase {
+  KNOCKOUT
+  GROUP_STAGE
+  ROUND_ROBIN
+  PAGE_PLAYOFF
+}
+
+enum Bracket {
+  MAIN
+  GROUP
+  UPPER
+  LOWER
+  TEAM
+}
+
+enum AdminRole {
+  SCORER // แก้เฉพาะผล/สถานะ
+  ADMIN // จัดการข้อมูลกิจกรรม
+  SUPERADMIN // จัดการสิทธิ์/คืนค่า
+}
+
+enum SkillRank {
+  NEW
+  D
+  C
+  B_MINUS @map("B-")
+  B_PLUS  @map("B+")
+  A
+  S
+}
+
+enum Gender {
+  M
+  F
+}
+
+enum CheckStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  READY
+  BLOCKED
+}
+
+enum TieStatus {
+  WAITING
+  PLAYING
+  COMPLETED
+}
+
+// ───────────────────────── ข้อมูลกิจกรรม ─────────────────────────
+
+model Tournament {
+  tournamentId String @id @map("tournament_id")
+  titleTh      String @map("title_th")
+  yearBe       Int    @map("year_be")
+  timezone     String @default("Asia/Bangkok")
+
+  // ยังไม่กำหนด = null ; หน้าเว็บจะ fallback ไปใช้ label ชั่วคราวใน TournamentDay
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  venue     String?
+
+  /// สถานที่ใน Excel ยังเป็นตัวเลือก ("สทย. หรือ สโมสรท่าอากาศยาน") จึงต้องยืนยันแยกจากการมีข้อความ
+  venueConfirmed Boolean @default(false) @map("venue_confirmed")
+
+  publicRefreshMs        Int     @default(3000) @map("public_refresh_ms")
+  registrationMode       String  @default("OFFLINE_ONLY") @map("registration_mode")
+  reportingMinutesBefore Int     @default(15) @map("reporting_minutes_before")
+  walkoverGraceMinutes   Int     @default(5) @map("walkover_grace_minutes")
+  walkoverScore          String  @default("21-0, 21-0") @map("walkover_score")
+  publicAdminTestMode    Boolean @default(false) @map("public_admin_test_mode")
+  simulationEnabled      Boolean @default(false) @map("simulation_enabled")
+
+  days      TournamentDay[]
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@map("tournament")
+}
+
+/// วันแข่ง: เก็บ label ชั่วคราว ("วันที่ 1") ไว้ก่อน แล้วเติม actualDate ทีหลังโดยไม่ต้องแก้ตารางแมตช์
+model TournamentDay {
+  id           Int        @id @default(autoincrement())
+  tournamentId String     @map("tournament_id")
+  tournament   Tournament @relation(fields: [tournamentId], references: [tournamentId], onDelete: Cascade)
+
+  dayNo         Int       @map("day_no")
+  labelTemp     String    @map("label_temp") // "วันที่ 1" — ใช้จนกว่าจะกำหนดวันจริง
+  actualDate    DateTime? @map("actual_date") @db.Date
+  venueOverride String?   @map("venue_override")
+  note          String?
+
+  @@unique([tournamentId, dayNo])
+  @@map("tournament_day")
+}
+
+model Team {
+  teamCode     String @id @map("team_code")
+  nameTh       String @map("name_th")
+  displayOrder Int    @map("display_order")
+  colorHex     String @map("color_hex")
+
+  pairs        Pair[]
+  participants Participant[]
+  scoreEvents  ColorScoreEvent[]
+
+  @@map("team")
+}
+
+model Level {
+  levelCode   String @id @map("level_code")
+  nameTh      String @map("name_th") // หน้าเว็บแสดงชื่อมือ ไม่แสดงคำว่า Level
+  eligibility String
+  pairSlots   Int    @map("pair_slots")
+  matchCount  Int    @map("match_count")
+  format      String
+  eventTypes  String @map("event_types")
+  teamTieSize Int    @default(0) @map("team_tie_size")
+  sortOrder   Int    @map("sort_order")
+
+  pairs        Pair[]
+  participants Participant[]
+  matches      Match[]
+  scoreRules   ColorScoringRule[]
+  scoreEvents  ColorScoreEvent[]
+
+  @@map("level")
+}
+
+// ───────────────────────── คู่แข่งขัน / นักกีฬา ─────────────────────────
+
+model Pair {
+  pairUid String @id @map("pair_uid") // รหัสถาวร ห้ามเปลี่ยน
+
+  levelCode String @map("level_code")
+  level     Level  @relation(fields: [levelCode], references: [levelCode])
+  teamCode  String @map("team_code")
+  team      Team   @relation(fields: [teamCode], references: [teamCode])
+  slotNo    Int    @map("slot_no")
+
+  /// มือ C และมือทั่วไปเลือก MD/WD/XD ทีหลัง จึงเป็น null ได้จนกว่าจะล็อกประเภท
+  eventType      EventType? @map("event_type")
+  publicPairCode String?    @unique @map("public_pair_code")
+  eventLockedAt  DateTime?  @map("event_locked_at")
+
+  player1Template String? @map("player1_template")
+  player2Template String? @map("player2_template")
+
+  withdrawn     Boolean @default(false)
+  withdrawnNote String? @map("withdrawn_note")
+
+  participants    Participant[]
+  drawAssignments DrawAssignment[]
+  lineups         Level4Lineup[]
+  matchesAsA      Match[]           @relation("PairA")
+  matchesAsB      Match[]           @relation("PairB")
+  matchesWon      Match[]           @relation("PairWinner")
+  scoreEvents     ColorScoreEvent[]
+
+  @@index([levelCode, teamCode])
+  @@map("pair")
+}
+
+model Participant {
+  participantUid String @id @map("participant_uid") // ไม่ใช้ชื่อคนเป็น Primary Key
+
+  pairUid  String @map("pair_uid")
+  pair     Pair   @relation(fields: [pairUid], references: [pairUid], onDelete: Cascade)
+  playerNo Int    @map("player_no")
+
+  displayCode String? @unique @map("display_code") // สี_LEVEL1-4_MD/WD/XD_คู่-คน
+
+  // ── ช่องที่รอกรอกจริง ──
+  actualName String?    @map("actual_name")
+  employeeId String?    @map("employee_id")
+  skillRank  SkillRank? @map("skill_rank")
+  gender     Gender?
+
+  teamCode  String     @map("team_code")
+  team      Team       @relation(fields: [teamCode], references: [teamCode])
+  levelCode String     @map("level_code")
+  level     Level      @relation(fields: [levelCode], references: [levelCode])
+  eventType EventType? @map("event_type")
+
+  eligibilityChecked Boolean @default(false) @map("eligibility_checked")
+  eligibilityNote    String? @map("eligibility_note")
+
+  @@unique([pairUid, playerNo])
+  @@index([employeeId])
+  @@map("participant")
+}
+
+// ───────────────────────── ตารางแมตช์ ─────────────────────────
+
+model Match {
+  matchUid String @id @map("match_uid") // MATCH-0001 .. MATCH-0158 — ใช้เป็นคีย์เสมอ
+  matchNo  Int    @unique @map("match_no")
+
+  /// โค้ดสายจาก Excel เช่น "L2-บน-SF1" มีภาษาไทย ใช้แสดงผล/อ้างอิงภายในเท่านั้น ห้ามใช้ใน URL
+  sourceMatchCode String @unique @map("source_match_code")
+
+  dayNo     Int    @map("day_no")
+  startTime String @map("start_time") // "10:00" เวลาโปรแกรม (Asia/Bangkok)
+  endTime   String @map("end_time")
+  courtNo   Int    @map("court_no")
+
+  levelCode  String     @map("level_code")
+  level      Level      @relation(fields: [levelCode], references: [levelCode])
+  eventType  EventType? @map("event_type") // null สำหรับสายรวมของมือ D / มือ C / มือทั่วไป
+  phase      Phase
+  bracket    Bracket
+  roundLabel String     @map("round_label")
+  groupKey   String?    @map("group_key") // "A".."D" สำหรับรอบแบ่งกลุ่ม
+
+  tieId      String?    @map("tie_id")
+  tie        Level4Tie? @relation(fields: [tieId], references: [tieId])
+  tieOrderNo Int?       @map("tie_order_no") // 1..3 = คู่ที่เท่าไรของคู่สี
+
+  // ที่มาของแต่ละฝั่ง ยังไม่ต้องรู้ pair_uid ตั้งแต่ต้น
+  sideASource String @map("side_a_source")
+  sideBSource String @map("side_b_source")
+
+  pairAUid String? @map("pair_a_uid")
+  pairA    Pair?   @relation("PairA", fields: [pairAUid], references: [pairUid])
+  pairBUid String? @map("pair_b_uid")
+  pairB    Pair?   @relation("PairB", fields: [pairBUid], references: [pairUid])
+
+  status        MatchStatus @default(WAITING)
+  walkover      Boolean     @default(false)
+  walkoverSide  String?     @map("walkover_side") // "A" | "B" = ฝั่งที่ไม่มาแข่ง
+  winnerPairUid String?     @map("winner_pair_uid")
+  winnerPair    Pair?       @relation("PairWinner", fields: [winnerPairUid], references: [pairUid])
+
+  games MatchGame[]
+
+  adminNote       String?    @map("admin_note")
+  publicUpdatedAt DateTime?  @map("public_updated_at")
+  updatedById     String?    @map("updated_by")
+  updatedBy       AdminUser? @relation(fields: [updatedById], references: [adminId])
+
+  @@index([dayNo, startTime, courtNo])
+  @@index([levelCode, bracket])
+  @@index([status])
+  @@map("match")
+}
+
+model MatchGame {
+  id       Int    @id @default(autoincrement())
+  matchUid String @map("match_uid")
+  match    Match  @relation(fields: [matchUid], references: [matchUid], onDelete: Cascade)
+
+  gameNo Int @map("game_no") // 1..3 (Best of 3)
+  scoreA Int @map("score_a")
+  scoreB Int @map("score_b")
+
+  @@unique([matchUid, gameNo])
+  @@map("match_game")
+}
+
+// ───────────────────────── มือทั่วไป: คู่สี + ส่งซอง ─────────────────────────
+
+model Level4Tie {
+  tieId String @id @map("tie_id")
+  tieNo Int    @unique @map("tie_no")
+
+  phase Phase
+  stage String
+
+  dayNo     Int    @map("day_no")
+  startTime String @map("start_time")
+  courts    String // "1,2,3"
+
+  /// PUR/GRN/RED/BLU หรือ RANK1..RANK4 / WINNER_T07 / LOSER_T07
+  teamASource String @map("team_a_source")
+  teamBSource String @map("team_b_source")
+
+  teamACode String? @map("team_a_code")
+  teamBCode String? @map("team_b_code")
+
+  requiredMatchWins Int     @default(2) @map("required_match_wins")
+  playAllThree      Boolean @default(true) @map("play_all_three")
+
+  status         TieStatus @default(WAITING)
+  winnerTeamCode String?   @map("winner_team_code")
+
+  matches Match[]
+  lineups Level4Lineup[]
+
+  @@map("level4_tie")
+}
+
+/// ส่งซองพร้อมกัน: คู่ 1 ระดับไม่ต่ำกว่าคู่ 2 และ 3
+model Level4Lineup {
+  id    Int       @id @default(autoincrement())
+  tieId String    @map("tie_id")
+  tie   Level4Tie @relation(fields: [tieId], references: [tieId], onDelete: Cascade)
+
+  teamCode String @map("team_code")
+  orderNo  Int    @map("order_no") // 1..3
+  pairUid  String @map("pair_uid")
+  pair     Pair   @relation(fields: [pairUid], references: [pairUid])
+
+  submittedAt DateTime  @default(now()) @map("submitted_at")
+  sealedAt    DateTime? @map("sealed_at") // เปิดซองพร้อมกันทั้งสองฝั่งแล้ว
+
+  @@unique([tieId, teamCode, orderNo])
+  @@unique([tieId, pairUid])
+  @@map("level4_lineup")
+}
+
+// ───────────────────────── การจับสลาก ─────────────────────────
+
+/// map token ที่มาของคู่ (SEED:.. / GROUP:..) -> pair_uid จริง
+/// ตารางนี้คือผลการจับสลาก ยังว่างได้จนกว่าจะจับสลากจริง
+model DrawAssignment {
+  id    Int    @id @default(autoincrement())
+  token String @unique // "SEED:L1:MD:01" | "GROUP:L2:A:SLOT1"
+
+  levelCode String  @map("level_code")
+  groupKey  String? @map("group_key")
+  slotNo    Int?    @map("slot_no")
+
+  pairUid String @map("pair_uid")
+  pair    Pair   @relation(fields: [pairUid], references: [pairUid])
+
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  assignedBy String?  @map("assigned_by")
+
+  @@unique([levelCode, pairUid])
+  @@index([levelCode, groupKey])
+  @@map("draw_assignment")
+}
+
+// ───────────────────────── คะแนนสี ─────────────────────────
+
+model ColorScoringRule {
+  id        Int    @id @default(autoincrement())
+  levelCode String @map("level_code")
+  level     Level  @relation(fields: [levelCode], references: [levelCode])
+
+  category String // MD/WD/XD | UPPER | LOWER | TEAM
+  result   String // "อันดับ 1" ...
+  rankNo   Int?   @map("rank_no") // 1/2/3 สำหรับเทียบเกณฑ์เหรียญ
+
+  points            Float
+  medal             String?
+  countsTowardTotal Boolean @default(true) @map("counts_toward_total")
+  note              String?
+
+  events ColorScoreEvent[]
+
+  @@unique([levelCode, category, result])
+  @@map("color_scoring_rule")
+}
+
+/// คะแนนที่ "ออกจริง" แล้ว — เก็บที่มาแยกตามระดับมือ/ผล เพื่อกดดูย้อนหลังได้
+model ColorScoreEvent {
+  id     Int              @id @default(autoincrement())
+  ruleId Int              @map("rule_id")
+  rule   ColorScoringRule @relation(fields: [ruleId], references: [id])
+
+  levelCode String @map("level_code")
+  level     Level  @relation(fields: [levelCode], references: [levelCode])
+  teamCode  String @map("team_code")
+  team      Team   @relation(fields: [teamCode], references: [teamCode])
+
+  pairUid String? @map("pair_uid")
+  pair    Pair?   @relation(fields: [pairUid], references: [pairUid])
+
+  points    Float
+  medal     String?
+  sourceRef String   @map("source_ref") // match_uid หรือ tie_id ที่ทำให้เกิดคะแนน
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([ruleId, teamCode, sourceRef])
+  @@index([teamCode])
+  @@map("color_score_event")
+}
+
+// ───────────────────────── ผู้ดูแล / audit ─────────────────────────
+
+model AdminUser {
+  adminId      String    @id @map("admin_id")
+  username     String    @unique
+  displayName  String    @map("display_name")
+  passwordHash String    @map("password_hash")
+  role         AdminRole
+  active       Boolean   @default(true)
+
+  mustChangePassword Boolean   @default(true) @map("must_change_password")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  matches   Match[]
+  auditLogs AuditLog[]
+
+  @@map("admin_user")
+}
+
+model AuditLog {
+  id      BigInt    @id @default(autoincrement())
+  actorId String    @map("actor_id")
+  actor   AdminUser @relation(fields: [actorId], references: [adminId])
+
+  action     String // MATCH_SCORE_UPDATE | DRAW_ASSIGN | LINEUP_SUBMIT | ...
+  entityType String @map("entity_type")
+  entityId   String @map("entity_id")
+
+  beforeJson Json?    @map("before_json")
+  afterJson  Json?    @map("after_json")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+model ChecklistItem {
+  id        Int         @id @default(autoincrement())
+  area      String
+  item      String
+  owner     String?
+  status    CheckStatus @default(NOT_STARTED)
+  blocking  Boolean     @default(true)
+  note      String?
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  @@map("checklist_item")
+}
+
+/// คำชี้ขาดของกรรมการเมื่อเกณฑ์อัตโนมัติแยกอันดับไม่ออก
+/// รองรับรายการ Blocking "ยืนยันเกณฑ์เสมอขั้นสุดท้ายมือทั่วไป"
+model TiebreakDecision {
+  id    Int    @id @default(autoincrement())
+  scope String // GROUP | L4_RR
+  key   String // "LEVEL2:A" | "LEVEL4"
+
+  /// ลำดับที่ชี้ขาด: pair_uid (GROUP) หรือ team_code (L4_RR) เรียงจากอันดับดีสุด
+  orderedKeys String[] @map("ordered_keys")
+
+  note      String?
+  decidedBy String?  @map("decided_by")
+  decidedAt DateTime @default(now()) @map("decided_at")
+
+  @@unique([scope, key])
+  @@map("tiebreak_decision")
+}
