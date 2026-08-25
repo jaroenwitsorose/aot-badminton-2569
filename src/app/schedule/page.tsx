@@ -109,10 +109,12 @@ export default function SchedulePage() {
                 <option value="DONE">จบแล้ว</option>
               </select>
             </label>
-            <label>
-              จำนวน
-              <input value={`${matches.length} แมตช์`} readOnly tabIndex={-1} />
-            </label>
+            <div>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>จำนวน</span>
+              <p style={{ margin: "6px 0 0", padding: "12px 0", fontWeight: 700 }}>
+                {matches.length} แมตช์
+              </p>
+            </div>
           </div>
         </div>
 

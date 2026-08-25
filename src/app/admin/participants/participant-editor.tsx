@@ -94,7 +94,7 @@ export function ParticipantEditor({
         </span>
       </div>
 
-      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(370px, 1fr))" }}>
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(370px, 100%), 1fr))" }}>
         {visible.map((pair) => (
           <PairCard key={pair.pairUid} pair={pair} teams={teams} allowedEvents={level?.eventTypes ?? ""} />
         ))}

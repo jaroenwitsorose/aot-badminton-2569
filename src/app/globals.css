@@ -117,6 +117,16 @@ button { cursor: pointer; }
 .button.ghost { border-color: var(--line); color: var(--ink); background: #fff; }
 .button:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* ป้ายเตือนว่าเป็นข้อมูลซ้อม — ติดใต้เมนูทุกหน้าสาธารณะ ต้องเห็นชัดแต่ไม่กลบเนื้อหา */
+.sim-notice {
+  background: repeating-linear-gradient(135deg, #fff2bf, #fff2bf 12px, #ffe9a3 12px, #ffe9a3 24px);
+  border-bottom: 1px solid #e3c65c;
+  color: #6b4d00;
+  font-size: 13px;
+  padding: 9px 0;
+}
+.sim-notice strong { font-weight: 800; }
+
 .live-badge {
   display: inline-flex; align-items: center; gap: 9px; padding: 8px 14px;
   border: 1px solid #ffffff30; background: #ffffff0d; border-radius: 999px;
@@ -374,6 +384,16 @@ button { cursor: pointer; }
 .button.danger { background: #b9232e; color: #fff; }
 .game-inputs { display: flex; gap: 8px; }
 .game-inputs input { width: 62px; text-align: center; border: 1px solid var(--line); padding: 9px; border-radius: 10px; }
+
+/* แถวกรอกสกอร์: ชื่อคู่ | ช่องกรอก 3 เกม — ผู้กรอกผลใช้มือถือข้างคอร์ต ต้องไม่ล้นจอ */
+.score-entry-grid { display: grid; grid-template-columns: minmax(150px, 1fr) auto; gap: 8px; align-items: center; }
+.score-input-row { display: flex; gap: 6px; }
+.score-input { width: 58px; text-align: center; }
+@media (max-width: 560px) {
+  .score-entry-grid { grid-template-columns: minmax(104px, 1fr) auto; gap: 6px; }
+  .score-input-row { gap: 4px; }
+  .score-input { width: 46px; padding: 8px 2px; }
+}
 
 footer.site-footer { background: #031735; color: #a8b7ca; padding: 26px 0; font-size: 12px; margin-top: 40px; }
 footer.site-footer a { color: #cfe0f4; }

@@ -3,10 +3,23 @@ import "./globals.css";
 import { getTournamentSnapshot, type TournamentSnapshot } from "@/lib/tournament";
 import { SnapshotProvider } from "@/components/snapshot-provider";
 import { SiteHeader } from "@/components/site-header";
+import { SimulationNotice } from "@/components/simulation-notice";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * ใช้แปลง path ของรูป og เป็น URL เต็มตอนแชร์ลิงก์ (LINE / Facebook)
+ * บน Vercel ค่า VERCEL_PROJECT_PRODUCTION_URL จะเป็นโดเมน production เสมอ
+ * ถ้าย้ายไปโดเมนของ ทอท. เอง ตั้ง NEXT_PUBLIC_SITE_URL ทับได้
+ */
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "การแข่งขันแบดมินตัน กีฬาภายใน ทอท. 2569",
   description: "ตารางแข่งขัน ผลแต่ละคอร์ต สายการแข่งขัน และคะแนนสีของทั้ง 4 สี แบบเรียลไทม์",
   icons: { icon: "/favicon.svg" },
@@ -48,6 +61,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {snapshot ? (
           <SnapshotProvider initial={snapshot}>
             <SiteHeader />
+            <SimulationNotice />
             {children}
             <footer className="site-footer">
               <div className="shell">

@@ -7,6 +7,7 @@ import { STATUS_TH } from "@/lib/labels";
 import { validateMatchGames } from "@/lib/validation";
 import { resetMatchAction, saveScoreAction, setMatchStatusAction, setWalkoverAction } from "../actions";
 import { PairLine, StatusChip } from "@/components/ui";
+import { ShowMoreBar, useVisibleCount } from "@/components/show-more";
 
 type Props = {
   matches: MatchView[];
@@ -39,6 +40,8 @@ export function ScoreBoard({ matches, days, levels, canReset }: Props) {
       return haystack.includes(q);
     });
   }, [matches, dayNo, levelCode, onlyOpen, query]);
+
+  const page = useVisibleCount(filtered.length, 20);
 
   return (
     <div className="flex flex-col gap-3">
@@ -94,11 +97,20 @@ export function ScoreBoard({ matches, days, levels, canReset }: Props) {
           ไม่มีแมตช์ตามเงื่อนไขที่เลือก
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {filtered.map((m) => (
-            <MatchEditor key={m.matchUid} match={m} canReset={canReset} />
-          ))}
-        </div>
+        <>
+          <div className="flex flex-col gap-2">
+            {filtered.slice(0, page.visible).map((m) => (
+              <MatchEditor key={m.matchUid} match={m} canReset={canReset} />
+            ))}
+          </div>
+          <ShowMoreBar
+            shown={page.visible}
+            total={filtered.length}
+            onMore={page.showMore}
+            onAll={page.showAll}
+            unit="แมตช์"
+          />
+        </>
       )}
     </div>
   );
@@ -153,7 +165,7 @@ function MatchEditor({ match, canReset }: { match: MatchView; canReset: boolean 
         </div>
       ) : null}
 
-      <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: "minmax(180px, 1fr) auto", alignItems: "center" }}>
+      <div className="score-entry-grid mt-2">
         <PairLine side={match.sideA} win={match.winnerSide === "A"} />
         <ScoreInputs
           disabled={!match.scorable || pending}
@@ -240,7 +252,7 @@ function ScoreInputs({
   disabled: boolean;
 }) {
   return (
-    <div className="flex gap-1.5">
+    <div className="score-input-row">
       {scores.map((s, i) => (
         <input
           key={i}
@@ -255,8 +267,7 @@ function ScoreInputs({
             const next = scores.map((x, idx) => (idx === i ? { ...x, [side]: e.target.value } : x));
             onChange(next);
           }}
-          className="tabular"
-          style={{ width: 58, textAlign: "center" }}
+          className="tabular score-input"
           placeholder={`G${i + 1}`}
         />
       ))}
@@ -290,18 +301,24 @@ function SpecialActions({
       </label>
 
       <div className="mt-2 flex flex-wrap gap-2">
-        {(["A", "B"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            disabled={!match.scorable || pending || !reason.trim()}
-            onClick={() => run(() => setWalkoverAction({ matchUid: match.matchUid, absentSide: s, reason }))}
-            className="rounded-lg border px-3 py-1.5 text-[13px]"
-            style={{ borderColor: "#f59e0b", color: "#b45309", background: "transparent", cursor: "pointer" }}
-          >
-            Walkover — ฝั่ง {s} ไม่มาแข่ง
-          </button>
-        ))}
+        {(["A", "B"] as const).map((s) => {
+          // แสดงชื่อคู่จริงแทน "ฝั่ง A/B" ผู้กรอกผลจะได้ไม่ต้องเดาว่าฝั่งไหนคือใคร
+          const side = s === "A" ? match.sideA : match.sideB;
+          const who = side.pair?.label ?? side.pendingLabel ?? `ฝั่ง ${s}`;
+          return (
+            <button
+              key={s}
+              type="button"
+              disabled={!match.scorable || pending || !reason.trim()}
+              onClick={() => run(() => setWalkoverAction({ matchUid: match.matchUid, absentSide: s, reason }))}
+              className="rounded-lg border px-3 py-1.5 text-[13px]"
+              style={{ borderColor: "#f59e0b", color: "#b45309", background: "transparent", cursor: "pointer", textAlign: "left" }}
+              title={`บันทึกว่า ${who} ไม่มาแข่ง อีกฝั่งชนะ Walkover`}
+            >
+              Walkover — <b>{who}</b> ไม่มาแข่ง
+            </button>
+          );
+        })}
 
         {canReset ? (
           <button

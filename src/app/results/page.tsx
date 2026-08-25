@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSnapshot } from "@/components/snapshot-provider";
 import { EmptyState, MatchCard } from "@/components/ui";
+import { ShowMoreBar, useVisibleCount } from "@/components/show-more";
 
 export default function ResultsPage() {
   const { snapshot } = useSnapshot();
@@ -29,6 +30,8 @@ export default function ResultsPage() {
       const bt = b.publicUpdatedAt ? Date.parse(b.publicUpdatedAt) : 0;
       return bt - at || b.matchNo - a.matchNo;
     });
+
+  const page = useVisibleCount(results.length);
 
   return (
     <main>
@@ -91,11 +94,20 @@ export default function ResultsPage() {
         {results.length === 0 ? (
           <EmptyState>ยังไม่มีผลการแข่งขันตามเงื่อนไขที่เลือก</EmptyState>
         ) : (
-          <div className="stack">
-            {results.map((m) => (
-              <MatchCard key={m.matchUid} match={m} />
-            ))}
-          </div>
+          <>
+            <div className="stack">
+              {results.slice(0, page.visible).map((m) => (
+                <MatchCard key={m.matchUid} match={m} />
+              ))}
+            </div>
+            <ShowMoreBar
+              shown={page.visible}
+              total={results.length}
+              onMore={page.showMore}
+              onAll={page.showAll}
+              unit="แมตช์"
+            />
+          </>
         )}
       </div>
     </main>

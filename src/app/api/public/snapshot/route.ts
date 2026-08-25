@@ -3,6 +3,8 @@
  *
  * อ่านอย่างเดียว ไม่ต้องล็อกอิน และไม่มีข้อมูลส่วนบุคคลที่ไม่จำเป็น
  * (รหัสพนักงานถูกตัดออกจาก payload สาธารณะ)
+ *
+ * รายชื่อนักกีฬาอยู่ใน snapshot.pairs ที่เดียว — ฝั่งของแมตช์ไม่ฝัง players ซ้ำ (ดู MatchSidePair)
  */
 
 import { NextResponse } from "next/server";
@@ -15,15 +17,9 @@ export async function GET() {
   try {
     const snapshot = await getTournamentSnapshot();
 
-    // ตัดข้อมูลที่ไม่ควรเปิดสาธารณะออก (รหัสพนักงาน)
     const publicSnapshot = {
       ...snapshot,
       pairs: snapshot.pairs.map(stripPair),
-      matches: snapshot.matches.map((m) => ({
-        ...m,
-        sideA: stripSide(m.sideA),
-        sideB: stripSide(m.sideB),
-      })),
     };
 
     return NextResponse.json(publicSnapshot, {
@@ -35,11 +31,7 @@ export async function GET() {
   }
 }
 
+/** รหัสพนักงานเป็นข้อมูลภายใน ไม่ส่งออกหน้าสาธารณะ */
 function stripPair<T extends { players: { employeeId: string | null }[] }>(pair: T): T {
   return { ...pair, players: pair.players.map((p) => ({ ...p, employeeId: null })) };
-}
-
-function stripSide<T extends { pair: { players: { employeeId: string | null }[] } | null }>(side: T): T {
-  if (!side.pair) return side;
-  return { ...side, pair: stripPair(side.pair) };
 }

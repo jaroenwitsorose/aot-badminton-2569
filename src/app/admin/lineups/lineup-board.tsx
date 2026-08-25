@@ -47,7 +47,7 @@ export function LineupBoard({
   teams: { teamCode: string; nameTh: string; colorHex: string }[];
 }) {
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))" }}>
+    <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(400px, 100%), 1fr))" }}>
       {ties.map((tie) => (
         <div key={tie.tieId} className="panel p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">

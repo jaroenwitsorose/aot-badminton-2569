@@ -50,8 +50,17 @@ export interface PairView {
   isPlaceholder: boolean;
 }
 
+/**
+ * ข้อมูลคู่แบบย่อที่ฝังในแต่ละฝั่งของแมตช์
+ *
+ * ตัด players ออกเพราะไม่มีหน้าไหนอ่านรายชื่อนักกีฬาจากตรงนี้ — หน้ารายชื่อและโปรไฟล์คู่
+ * อ่านจาก snapshot.pairs แทน ถ้าฝังไว้จะกลายเป็นข้อมูลซ้ำ 632 ชุด (158 แมตช์ × 2 ฝั่ง × 2 คน)
+ * ในก้อนข้อมูลที่หน้าสาธารณะโหลดใหม่ทุก 3 วินาที
+ */
+export type MatchSidePair = Omit<PairView, "players">;
+
 export interface SideView {
-  pair: PairView | null;
+  pair: MatchSidePair | null;
   pendingLabel: string;
   teamCode: TeamCode | null;
   teamNameTh: string | null;
@@ -152,6 +161,8 @@ export interface TournamentSnapshot {
     reportingMinutesBefore: number;
     walkoverGraceMinutes: number;
     walkoverScore: string;
+    /** เปิดอยู่ = ผลที่แสดงเป็นผลซ้อม ไม่ใช่ผลจริง หน้าสาธารณะต้องบอกผู้ชมให้ชัด */
+    simulationEnabled: boolean;
   };
   days: { dayNo: number; label: string; actualDate: string | null; confirmed: boolean }[];
   teams: { teamCode: TeamCode; nameTh: string; colorHex: string; displayOrder: number }[];
@@ -321,7 +332,9 @@ export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
   const sideView = (
     res: { pairUid: string | null; pendingLabel: string; teamCode: TeamCode | null },
   ): SideView => {
-    const pair = res.pairUid ? pairViews.get(res.pairUid) ?? null : null;
+    const full = res.pairUid ? pairViews.get(res.pairUid) ?? null : null;
+    // ตัด players ทิ้งตรงนี้ ดู MatchSidePair
+    const pair: MatchSidePair | null = full ? (({ players: _players, ...rest }) => rest)(full) : null;
     const teamCode = pair?.teamCode ?? res.teamCode;
     const team = teamCode ? teamByCode.get(teamCode) : undefined;
     return {
@@ -484,6 +497,7 @@ export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
       reportingMinutesBefore: tournament.reportingMinutesBefore,
       walkoverGraceMinutes: tournament.walkoverGraceMinutes,
       walkoverScore: tournament.walkoverScore,
+      simulationEnabled: tournament.simulationEnabled,
     },
     days: days.map((d) => ({
       dayNo: d.dayNo,

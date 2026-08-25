@@ -130,15 +130,14 @@ export async function requireRole(minimum: Role): Promise<Session> {
   return session;
 }
 
-export async function verifyPassword(username: string, password: string): Promise<Session | null> {
+/**
+ * ตรวจรหัสผ่านอย่างเดียว ไม่มีผลข้างเคียง
+ * ใช้ตอนยืนยันรหัสผ่านเดิมในหน้าเปลี่ยนรหัสผ่าน ซึ่งไม่ใช่การเข้าสู่ระบบใหม่
+ */
+export async function checkPassword(username: string, password: string): Promise<Session | null> {
   const user = await prisma.adminUser.findUnique({ where: { username } });
   if (!user || !user.active) return null;
   if (!(await bcrypt.compare(password, user.passwordHash))) return null;
-
-  await prisma.adminUser.update({
-    where: { adminId: user.adminId },
-    data: { lastLoginAt: new Date() },
-  });
 
   return {
     adminId: user.adminId,
@@ -147,6 +146,19 @@ export async function verifyPassword(username: string, password: string): Promis
     role: user.role as Role,
     mustChangePassword: user.mustChangePassword,
   };
+}
+
+/** ใช้ตอนเข้าสู่ระบบเท่านั้น — บันทึกเวลาเข้าใช้ล่าสุดด้วย */
+export async function verifyPassword(username: string, password: string): Promise<Session | null> {
+  const session = await checkPassword(username, password);
+  if (!session) return null;
+
+  await prisma.adminUser.update({
+    where: { adminId: session.adminId },
+    data: { lastLoginAt: new Date() },
+  });
+
+  return session;
 }
 
 export async function hashPassword(plain: string): Promise<string> {

@@ -26,6 +26,9 @@ export function LiveCourtStrip() {
     );
   };
 
+  // แข่งครบทุกแมตช์แล้ว ต่างจาก "คอร์ตว่าง" ระหว่างวัน ต้องบอกให้ตรงความจริง
+  const allFinished = snapshot.matches.length > 0 && snapshot.matches.every((m) => m.decided);
+
   return (
     <section className="live-section">
       <div className="shell">
@@ -52,7 +55,7 @@ export function LiveCourtStrip() {
               <article className="court-card" key={courtNo}>
                 <header>
                   <span>คอร์ต {courtNo}</span>
-                  <span>{match ? `#${match.matchNo}` : "ว่าง"}</span>
+                  <span>{match ? `#${match.matchNo}` : allFinished ? "จบแล้ว" : "ว่าง"}</span>
                 </header>
                 {match ? (
                   <p>
@@ -69,7 +72,7 @@ export function LiveCourtStrip() {
                     พบ {sideB}
                   </p>
                 ) : (
-                  <p>ไม่มีแมตช์ในคอร์ตนี้</p>
+                  <p>{allFinished ? "แข่งครบทุกแมตช์แล้ว" : "ไม่มีแมตช์ในคอร์ตนี้"}</p>
                 )}
               </article>
             );

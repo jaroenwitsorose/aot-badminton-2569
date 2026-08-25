@@ -16,6 +16,7 @@ import type { EventType, Gender, MatchStatus, SkillRank } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   AuthError,
+  checkPassword,
   createSession,
   destroySession,
   getSession,
@@ -118,7 +119,7 @@ export async function changePasswordAction(
     if (next !== confirm) return fail("รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน");
     const weak = validatePasswordStrength(next);
     if (weak) return fail(weak);
-    if (!(await verifyPassword(session.username, current))) return fail("รหัสผ่านเดิมไม่ถูกต้อง");
+    if (!(await checkPassword(session.username, current))) return fail("รหัสผ่านเดิมไม่ถูกต้อง");
     if (current === next) return fail("รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม");
 
     await prisma.$transaction(async (tx) => {
@@ -491,6 +492,11 @@ export async function assignDrawAction(input: { token: string; pairUid: string }
       return fail(`ช่องนี้เป็นประเภท ${parts[2]} แต่คู่ที่เลือกเป็น ${pair.eventType ?? "ยังไม่ล็อกประเภท"}`);
     }
     if (pair.withdrawn) return fail("คู่นี้ถอนตัวแล้ว");
+    // Excel ระบุว่ามือ C และมือทั่วไปต้องล็อก MD/WD/XD ก่อนนำเข้าสาย
+    // (ช่อง SEED ของมือใหม่ผูกประเภทไว้อยู่แล้ว จึงถูกตรวจไปก่อนหน้านี้)
+    if (!pair.eventType) {
+      return fail("คู่นี้ยังไม่ได้ล็อกประเภท MD/WD/XD — ล็อกที่หน้ารายชื่อนักกีฬาก่อนจับสลาก");
+    }
 
     const existingForPair = await prisma.drawAssignment.findFirst({
       where: { levelCode, pairUid: input.pairUid, token: { not: input.token } },
@@ -652,10 +658,16 @@ export async function saveTournamentAction(
     if (!tournament) return fail("ยังไม่ได้นำเข้าข้อมูลตั้งต้น");
 
     const venue = String(formData.get("venue") ?? "").trim();
-    const venueConfirmed = formData.get("venueConfirmed") === "on" && venue.length > 0;
+    const wantVenueConfirmed = formData.get("venueConfirmed") === "on";
     const startDate = String(formData.get("startDate") ?? "");
     const endDate = String(formData.get("endDate") ?? "");
     const refreshMs = Number(formData.get("publicRefreshMs") ?? tournament.publicRefreshMs);
+
+    // เดิมติ๊กยืนยันสถานที่ตอนช่องว่างแล้วระบบเงียบ ๆ ไม่ยืนยันให้ ทำให้เข้าใจผิดว่ายืนยันแล้ว
+    if (wantVenueConfirmed && !venue) {
+      return fail("กรอกชื่อสถานที่ก่อน จึงจะติ๊กยืนยันสถานที่ได้");
+    }
+    const venueConfirmed = wantVenueConfirmed;
 
     if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
       return fail("วันเริ่มต้องไม่หลังวันสิ้นสุด");
@@ -665,6 +677,20 @@ export async function saveTournamentAction(
     }
 
     const dayDates = [1, 2, 3].map((n) => String(formData.get(`day${n}`) ?? ""));
+
+    // วันแข่งกรอก 2 ที่ (ช่วงวันรวม กับ วันของแต่ละวันแข่ง) เดิมขัดกันได้เงียบ ๆ
+    const filledDays = dayDates.filter(Boolean);
+    if (startDate && endDate && filledDays.length > 0) {
+      const outside = filledDays.filter((d) => d < startDate || d > endDate);
+      if (outside.length > 0) {
+        return fail(
+          `วันของแต่ละวันแข่ง (${outside.join(", ")}) อยู่นอกช่วง ${startDate} ถึง ${endDate} — แก้ให้ตรงกันก่อน`,
+        );
+      }
+    }
+    if (new Set(filledDays).size !== filledDays.length) {
+      return fail("วันของแต่ละวันแข่งซ้ำกัน — วันที่ 1-3 ต้องเป็นคนละวัน");
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.tournament.update({
