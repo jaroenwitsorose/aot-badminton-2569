@@ -29,6 +29,12 @@ export default async function LineupsPage() {
           ส่งพร้อมกันทั้งสองสี · คู่ที่ 1 ต้องมีระดับมือไม่ต่ำกว่าคู่ที่ 2 และ 3 ·
           คู่สีที่เริ่มแข่งแล้วแก้ซองไม่ได้
         </p>
+        <p className="m-0 mt-1 text-[12px]" style={{ color: "var(--muted)" }}>
+          กรอกทีเดียวหลายรายการได้ที่{" "}
+          <a href="/admin/participants" style={{ textDecoration: "underline" }}>
+            รายชื่อนักกีฬา → กรอกข้อมูลด้วยไฟล์ Excel
+          </a>
+        </p>
       </div>
 
       <LineupBoard

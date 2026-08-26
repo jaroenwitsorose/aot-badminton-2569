@@ -1,6 +1,7 @@
 import { requirePage } from "@/lib/page-guard";
 import { prisma } from "@/lib/prisma";
 import { ParticipantEditor } from "./participant-editor";
+import { ExcelPanel } from "./excel-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export default async function ParticipantsPage() {
           กรอกชื่อจริง รหัสพนักงาน ระดับมือ และเพศ · ระบบจะเตือนถ้ารหัสพนักงานซ้ำหรือระดับมือไม่ตรงเกณฑ์
         </p>
       </div>
+
+      <ExcelPanel />
 
       <ParticipantEditor
         levels={levels.map((l) => ({ levelCode: l.levelCode, nameTh: l.nameTh, eventTypes: l.eventTypes }))}

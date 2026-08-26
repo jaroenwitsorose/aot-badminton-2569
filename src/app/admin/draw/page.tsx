@@ -49,6 +49,12 @@ export default async function DrawPage() {
           จับคู่ &quot;ช่องในสาย&quot; กับ &quot;คู่แข่งขัน&quot; · ระบบจะคลี่สายที่เหลือให้เองเมื่อผลออก ·
           ช่องที่มีแมตช์เริ่มแข่งแล้วจะแก้ไม่ได้
         </p>
+        <p className="m-0 mt-1 text-[12px]" style={{ color: "var(--muted)" }}>
+          กรอกทีเดียวหลายรายการได้ที่{" "}
+          <a href="/admin/participants" style={{ textDecoration: "underline" }}>
+            รายชื่อนักกีฬา → กรอกข้อมูลด้วยไฟล์ Excel
+          </a>
+        </p>
       </div>
 
       <DrawBoard
