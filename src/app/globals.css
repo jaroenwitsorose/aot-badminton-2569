@@ -127,6 +127,52 @@ button { cursor: pointer; }
 }
 .sim-notice strong { font-weight: 800; }
 
+/* ───────── การ์ดเส้นทางการแข่งขัน (หน้าตารางแข่งขัน) ───────── */
+
+.path-card { padding: 20px; margin-bottom: 18px; border-left: 5px solid var(--blue); }
+.path-head { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: space-between; }
+.path-summary { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.path-big { font-size: 40px; font-weight: 800; line-height: 1; color: var(--blue); }
+.path-big-label { font-size: 11px; color: var(--muted); line-height: 1.35; }
+.path-badge { padding: 8px 14px; border-radius: 999px; font-weight: 800; font-size: 13px; }
+.path-badge.win { background: #fff2bf; color: #6b4d00; }
+.path-badge.out { background: #eef1f6; color: var(--muted); }
+
+.path-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+.path-row {
+  display: grid; grid-template-columns: 78px minmax(0, 1fr) auto;
+  gap: 10px; align-items: center;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff;
+}
+.path-row .path-tag {
+  font-size: 11px; font-weight: 800; text-align: center;
+  padding: 4px 6px; border-radius: 999px; white-space: nowrap;
+}
+.path-row.won .path-tag { background: #e5f7ec; color: #087c3b; }
+.path-row.lost .path-tag { background: #ffe7e9; color: #bb202c; }
+.path-row.next .path-tag { background: var(--blue-soft); color: #1b5dc1; }
+.path-row.projected { border-style: dashed; background: #fbfcfe; }
+.path-row.projected .path-tag { background: #f2f5fa; color: var(--muted); }
+.path-row.projected .path-main { color: var(--muted); }
+.path-main { min-width: 0; }
+.path-main small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; overflow-wrap: anywhere; }
+.path-score { font-weight: 800; white-space: nowrap; }
+
+/* ชิปเลือกคู่เมื่อค้นหาแล้วเจอหลายคู่ */
+.pair-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.pair-chip {
+  border: 1px solid var(--line); background: #fff; border-radius: 999px;
+  padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.pair-chip[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: transparent; }
+
+@media (max-width: 650px) {
+  .path-card { padding: 14px; }
+  .path-big { font-size: 32px; }
+  .path-row { grid-template-columns: 62px minmax(0, 1fr) auto; padding: 8px 10px; gap: 8px; }
+  .path-row .path-tag { font-size: 10px; padding: 3px 4px; }
+}
+
 .live-badge {
   display: inline-flex; align-items: center; gap: 9px; padding: 8px 14px;
   border: 1px solid #ffffff30; background: #ffffff0d; border-radius: 999px;

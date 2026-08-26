@@ -16,7 +16,8 @@
     "db:reset": "prisma migrate reset --force",
     "excel:extract": "py data/extract_from_excel.py",
     "simulate": "tsx scripts/simulate.ts",
-    "db:reset-results": "tsx scripts/reset-demo-data.ts"
+    "db:reset-results": "tsx scripts/reset-demo-data.ts",
+    "verify:path": "tsx scripts/verify-path.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
