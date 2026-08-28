@@ -397,7 +397,9 @@ for (const d of days) {
   const inDay = M.filter((m) => m.dayNo === d);
   const first = inDay.reduce((a, b) => (a.startTime < b.startTime ? a : b)).startTime;
   const last = inDay.reduce((a, b) => (a.endTime > b.endTime ? a : b)).endTime;
-  banner(`วันแข่งขันที่ ${d}   (${first}–${last} น. · ${courts.length} คอร์ต)`, NAVY, "FFFFFFFF", 13, 26);
+  // แต่ละวันใช้คอร์ตไม่เท่ากัน (วันสุดท้ายใช้แค่ 3) — บอกให้ตรงกับความจริงของวันนั้น
+  const dayCourts = new Set(inDay.map((m) => m.courtNo));
+  banner(`วันแข่งขันที่ ${d}   (${first}–${last} น. · ${dayCourts.size} คอร์ต)`, NAVY, "FFFFFFFF", 13, 26);
 
   const head = grid.addRow(["เวลา", ...courts.map((c) => `คอร์ตที่ ${c}`)]);
   head.height = 22;
@@ -415,7 +417,9 @@ for (const d of days) {
       `${t}-${inSlot[0].endTime}`,
       ...courts.map((c) => {
         const m = inSlot.find((x) => x.courtNo === c);
-        return m ? cellText(m) : "ว่าง";
+        if (m) return cellText(m);
+        // คอร์ตที่วันนั้นไม่ได้ใช้เลย ปล่อยว่างสนิท ไม่ต้องเขียนอะไร
+        return dayCourts.has(c) ? "ว่าง" : "";
       }),
     ]);
     row.height = 34;
@@ -432,9 +436,16 @@ for (const d of days) {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
         return;
       }
-      const m = inSlot.find((x) => x.courtNo === courts[i - 2]);
+      const court = courts[i - 2];
+      const m = inSlot.find((x) => x.courtNo === court);
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       if (!m) {
+        // คอร์ตที่วันนั้นไม่เปิดใช้ ทำเป็นพื้นเทาทึบให้รู้ว่า "ไม่มีคอร์ตนี้" ไม่ใช่ "ว่างรอคิว"
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: dayCourts.has(court) ? "FFFFFFFF" : "FFEDEDED" },
+        };
         cell.font = { size: 10, italic: true, color: { argb: "FFAAAAAA" } };
         return;
       }
@@ -444,7 +455,7 @@ for (const d of days) {
   }
 
   // แถวสำรองท้ายวัน — เผื่อแมตช์ยืดหรือมีเหตุให้เลื่อน
-  const reserve = grid.addRow(["สำรอง", ...courts.map(() => "สำรอง")]);
+  const reserve = grid.addRow(["สำรอง", ...courts.map((c) => (dayCourts.has(c) ? "สำรอง" : ""))]);
   reserve.height = 24;
   reserve.eachCell({ includeEmpty: true }, (cell) => {
     cell.font = { size: 10, italic: true, color: { argb: "FF999999" } };

@@ -29,7 +29,13 @@ const CHECK_ONLY = process.argv.includes("--check");
 
 /** ระยะพักขั้นต่ำ (จำนวนช่วงเวลา) ระหว่างแมตช์ที่ผลต่อกัน — ตารางเดิมใช้ 2 */
 const REST_SLOTS = 2;
+/**
+ * จำนวนคอร์ตที่ใช้ได้ในแต่ละวัน — วันที่ 3 ใช้แค่ 3 คอร์ตตามแผนสถานที่เดิม
+ * ตัวจัดตารางเวอร์ชันแรกไม่มีเพดานนี้ เลยล้นไปใช้คอร์ต 4 ในวันที่ 3
+ */
+const COURTS_PER_DAY: Record<number, number> = { 1: 5, 2: 5, 3: 3 };
 const COURTS = 5;
+const courtsOn = (slotIndex: number) => COURTS_PER_DAY[slots[slotIndex].dayNo] ?? COURTS;
 const LEVEL_OF: Record<string, string> = { L1: "LEVEL1", L2: "LEVEL2", L3: "LEVEL3", L4: "LEVEL4" };
 
 interface SeedMatch {
@@ -244,7 +250,7 @@ function canPlace(u: Unit, startSlot: number): boolean {
     const group = u.groups[gi];
     const slotUse = usage[si];
 
-    if (slotUse.courtsUsed.size + group.length > COURTS) return false;
+    if (slotUse.courtsUsed.size + group.length > courtsOn(si)) return false;
 
     // คู่สีมือทั่วไปจองช่วงเวลาแบบผูกขาด — คู่สีต่างรอบกันมีสีซ้ำกันเสมอ
     // (เช่น ม่วง-เขียว กับ ม่วง-แดง) ถ้าปล่อยให้ทับกัน สีม่วงต้องลงสองคอร์ตพร้อมกัน
@@ -280,7 +286,7 @@ function place(u: Unit, startSlot: number): void {
   u.groups.forEach((group, gi) => {
     const slotUse = usage[startSlot + gi];
     const courts: number[] = [];
-    for (let c = 1; c <= COURTS && courts.length < group.length; c += 1) {
+    for (let c = 1; c <= courtsOn(startSlot + gi) && courts.length < group.length; c += 1) {
       if (!slotUse.courtsUsed.has(c)) courts.push(c);
     }
     courts.forEach((c) => slotUse.courtsUsed.add(c));
@@ -316,6 +322,62 @@ for (const u of [...units].sort((a, b) => a.tier - b.tier || a.order - b.order))
   const slot = searchOrder(u.anchor).find((s) => canPlace(u, s));
   if (slot === undefined) failed.push(u);
   else place(u, slot);
+}
+
+/**
+ * อัดตารางให้แน่น — ห้ามมีคอร์ตว่างคาอยู่กลางวันขณะที่ยังมีแมตช์รอคิวอยู่ข้างหลัง
+ *
+ * การวางรอบแรกยึดตำแหน่งเดิมเป็นหลัก จึงเหลือรูโหว่ (เช่น เช้าวันแรกว่าง 1 คอร์ต)
+ * รอบนี้จึงไล่ดึงแมตช์ที่อยู่หลังกว่าในวันเดียวกันขึ้นมาเติม
+ * ย้ายเฉพาะภายในวันเดียวกัน เพื่อไม่ให้จังหวะของงานเพี้ยน (ชิงชนะเลิศต้องอยู่ท้ายงาน)
+ */
+function rebuildUsage(): void {
+  for (const u of usage) {
+    u.courtsUsed.clear();
+    u.tokens.clear();
+    u.l1Events.clear();
+    u.hasL4 = false;
+  }
+  for (const [id, p] of placed) {
+    const unit = unitById.get(id)!;
+    unit.groups.forEach((group, gi) => {
+      const su = usage[p.startSlot + gi];
+      p.courtsPerGroup[gi].forEach((c) => su.courtsUsed.add(c));
+      for (const n of group) {
+        const m = byNo.get(n)!;
+        fixedTokens(m).forEach((t) => su.tokens.add(t));
+        if (m.levelCode === "LEVEL1" && m.eventType) su.l1Events.add(m.eventType);
+      }
+      if (unit.isL4) su.hasL4 = true;
+    });
+  }
+}
+
+let compacted = 0;
+for (let pass = 0; pass < 500; pass += 1) {
+  let didMove = false;
+  for (let s = 0; s < slots.length && !didMove; s += 1) {
+    if (usage[s].courtsUsed.size >= courtsOn(s)) continue;
+
+    const candidates = [...placed.entries()]
+      .filter(([, p]) => p.startSlot > s && slots[p.startSlot].dayNo === slots[s].dayNo)
+      .sort((a, b) => a[1].startSlot - b[1].startSlot);
+
+    for (const [id, saved] of candidates) {
+      const u = unitById.get(id)!;
+      placed.delete(id);
+      rebuildUsage();
+      if (canPlace(u, s)) {
+        place(u, s);
+        compacted += 1;
+        didMove = true;
+        break;
+      }
+      placed.set(id, saved);
+      rebuildUsage();
+    }
+  }
+  if (!didMove) break;
 }
 
 if (failed.length > 0) {
@@ -383,7 +445,19 @@ for (const day of [...slotsOfDay.keys()].sort()) {
   }
 }
 console.log("\n" + "─".repeat(74));
-console.log(`วางครบ ${matches.length} แมตช์ ในกริดเดิม ${slots.length} ช่วงเวลา ไม่ขยายวัน`);
+console.log(`วางครบ ${matches.length} แมตช์ ในกริดเดิม ${slots.length} ช่วงเวลา ไม่ขยายวัน · ดึงขึ้นมาเติมช่องว่าง ${compacted} ครั้ง`);
+for (const day of [...slotsOfDay.keys()].sort()) {
+  const cap = COURTS_PER_DAY[day] ?? COURTS;
+  const inDay = matches.filter((m) => m.dayNo === day);
+  const used = [...new Set(inDay.map((m) => m.startTime))];
+  const gaps = used
+    .map((t) => ({ t, n: inDay.filter((m) => m.startTime === t).length }))
+    .filter((x) => x.n < cap);
+  console.log(
+    `  วันที่ ${day}: ${inDay.length} แมตช์ · ${cap} คอร์ต · ช่องที่ไม่เต็ม ` +
+      (gaps.length === 0 ? "ไม่มี" : gaps.map((g) => `${g.t}(${g.n}/${cap})`).join(" ")),
+  );
+}
 
 if (CHECK_ONLY) {
   console.log("\n--check : ไม่เขียนไฟล์\n");
