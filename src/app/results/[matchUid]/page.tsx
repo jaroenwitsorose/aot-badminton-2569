@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { TieBonusNotice } from "@/components/tie-bonus-notice";
 import { useParams } from "next/navigation";
 import { useSnapshot } from "@/components/snapshot-provider";
 import { EmptyState, LevelChip, PairLine, StatusChip, TeamTag } from "@/components/ui";
@@ -118,6 +119,7 @@ export default function MatchDetailPage() {
                   1 คู่สี = 3 แมตช์ ชนะ 2 ใน 3 และต้องแข่งครบทั้ง 3 แมตช์ ·
                   ขณะนี้ {tie.matchWinsA}-{tie.matchWinsB} (แข่งแล้ว {tie.playedCount}/3)
                 </p>
+                <TieBonusNotice tie={tie} match={match} />
                 <div className="stack">
                   {tieMatches.map((m) => (
                     <TieRow key={m.matchUid} match={m} current={m.matchUid === match.matchUid} />

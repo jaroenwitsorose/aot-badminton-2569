@@ -18,6 +18,10 @@ import {
   type EventType,
   type Phase,
 } from "@prisma/client";
+import {
+  BASE_TOTAL_POINTS,
+  PLAYOFF_CONSOLATION_RESULT,
+} from "../src/lib/engine/scoring-constants";
 import { loadSeedFile } from "../src/lib/seed-data";
 
 const prisma = new PrismaClient();
@@ -181,6 +185,15 @@ async function main(): Promise<void> {
   }
 
   // ── ตารางแมตช์ (ไม่ทับผลที่กรอกไปแล้ว) ──────────────────────
+  //
+  // match_no เป็นคอลัมน์ unique และเลขแมตช์เรียงใหม่ได้เมื่อจัดตารางใหม่
+  // ถ้า upsert ตรง ๆ จะชนกันกลางคัน (แมตช์ A ขอเลข 5 ที่แมตช์ B ยังถืออยู่)
+  // จึงพลิกเลขเดิมเป็นค่าลบก่อน เพื่อเปิดทางให้เลขใหม่ทั้งชุดลงได้
+  const existingMatches = await prisma.match.count();
+  if (existingMatches > 0) {
+    await prisma.$executeRaw`UPDATE "match" SET match_no = -match_no WHERE match_no > 0`;
+  }
+
   for (const m of seed.matches) {
     const common = {
       matchNo: m.matchNo,
@@ -205,6 +218,13 @@ async function main(): Promise<void> {
       update: common,
       create: { matchUid: m.matchUid, ...common },
     });
+  }
+
+  const strayMatches = await prisma.match.count({ where: { matchNo: { lt: 0 } } });
+  if (strayMatches > 0) {
+    throw new Error(
+      `มีแมตช์ ${strayMatches} รายการในฐานข้อมูลที่ไม่มีใน seed-data.json — ตรวจก่อนนำเข้าซ้ำ`,
+    );
   }
 
   // ── กติกาคะแนนสี ───────────────────────────────────────────
@@ -237,11 +257,16 @@ async function main(): Promise<void> {
     });
   }
 
-  const totalPoints = seed.scoring
-    .filter((r) => r.countsTowardTotal)
+  // คะแนน "หลัก" (เหรียญของทุกระดับ) ต้องรวมได้ 37 พอดีเสมอ
+  // โบนัสปลอบใจของ Page Playoff แจกตามผลการแข่ง จึงไม่นับรวมในการตรวจนี้
+  const basePoints = seed.scoring
+    .filter((r) => r.countsTowardTotal && r.result !== PLAYOFF_CONSOLATION_RESULT)
     .reduce((s, r) => s + r.points, 0);
-  if (Math.abs(totalPoints - 37) > 1e-9) {
-    throw new Error(`กติกาคะแนนสีรวมได้ ${totalPoints} (ต้องเป็น 37)`);
+  if (Math.abs(basePoints - BASE_TOTAL_POINTS) > 1e-9) {
+    throw new Error(`กติกาคะแนนหลักรวมได้ ${basePoints} (ต้องเป็น ${BASE_TOTAL_POINTS})`);
+  }
+  if (!seed.scoring.some((r) => r.result === PLAYOFF_CONSOLATION_RESULT)) {
+    throw new Error("ไม่พบกติกาโบนัสปลอบใจของรอบ Page Playoff ใน seed-data.json");
   }
 
   // ── Checklist ก่อน Go-live ─────────────────────────────────

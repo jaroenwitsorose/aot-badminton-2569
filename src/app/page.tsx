@@ -9,6 +9,8 @@ import { EmptyState, LevelChip, MatchCard, SectionHeading } from "@/components/u
 export default function HomePage() {
   const { snapshot } = useSnapshot();
   const { tournament, levels, teamTotals, readiness, days } = snapshot;
+  // แถบคะแนนเทียบกับสีที่นำอยู่ ไม่ใช่เทียบกับ 37 ซึ่งเป็นยอดที่ 4 สีแบ่งกัน
+  const scoreLeader = Math.max(1, ...teamTotals.map((t) => t.points));
 
   const dateText = tournament.datesConfirmed
     ? `${days[0]?.label ?? ""} – ${days[days.length - 1]?.label ?? ""}`.replace(/วันที่ \d+ · /g, "")
@@ -172,7 +174,7 @@ export default function HomePage() {
         <SectionHeading
           eyebrow="COLOR STANDINGS"
           title="คะแนนสี"
-          sub="คะแนนรวมสูงสุดต่อสี 37 คะแนน · เกณฑ์เสมอ: เหรียญทอง > เหรียญเงิน > เหรียญทองแดง"
+          sub="คะแนนหลัก 37 คะแนนแบ่งกันระหว่าง 4 สี + โบนัสปลอบใจมือทั่วไป · เกณฑ์เสมอ: เหรียญทอง > เหรียญเงิน > เหรียญทองแดง"
           right={
             <Link href="/scores" style={{ color: "var(--blue)", fontWeight: 800, fontSize: 14 }}>
               ดูที่มาของคะแนน →
@@ -192,7 +194,7 @@ export default function HomePage() {
                   {t.points}
                 </b>
                 <div className="score-meter">
-                  <div style={{ width: `${(t.points / 37) * 100}%`, background: t.colorHex }} />
+                  <div style={{ width: `${(t.points / scoreLeader) * 100}%`, background: t.colorHex }} />
                 </div>
                 <p className="medals" style={{ margin: "12px 0 0" }}>
                   ทอง {t.gold} · เงิน {t.silver} · ทองแดง {t.bronze}

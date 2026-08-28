@@ -110,7 +110,7 @@ export interface MatchView {
 export interface TieView extends TieResult {
   tieNo: number;
   stage: string;
-  phase: string;
+  // phase สืบทอดมาจาก TieResult แล้ว (ROUND_ROBIN | PAGE_PLAYOFF)
   dayNo: number;
   dayLabel: string;
   startTime: string;

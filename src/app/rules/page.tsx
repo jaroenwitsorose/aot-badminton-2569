@@ -93,7 +93,7 @@ export default function RulesPage() {
           </article>
 
           <article className="rule-card">
-            <h2>คะแนนสี (รวมสูงสุด 37 คะแนน)</h2>
+            <h2>คะแนนสี (คะแนนหลัก 37 คะแนน แบ่งกันระหว่าง 4 สี)</h2>
             <div className="scroll-x">
               <table className="data-table">
                 <thead>
@@ -138,8 +138,38 @@ export default function RulesPage() {
                 </tbody>
               </table>
             </div>
-            <p style={{ marginBottom: 0 }}>
+            <p>
               เกณฑ์ตัดสินเมื่อคะแนนสีรวมเท่ากัน: เหรียญทองมากกว่า → เหรียญเงินมากกว่า → เหรียญทองแดงมากกว่า
+            </p>
+
+            <h3 style={{ marginBottom: 6 }}>โบนัสปลอบใจ — มือทั่วไป รอบ Page Playoff</h3>
+            <div className="notice warn" style={{ marginTop: 0 }}>
+              <p style={{ margin: "0 0 8px", fontWeight: 700 }}>
+                สีที่แพ้คู่สี แต่ยังชนะได้อย่างน้อย 1 คู่ จะได้ 0.5 คะแนนสี
+              </p>
+              <p style={{ margin: "0 0 8px" }}>อ่านง่าย ๆ คือ</p>
+              <ul style={{ margin: "0 0 8px", paddingInlineStart: 20 }}>
+                <li>
+                  แพ้ <b>1-2</b> (ชนะ 1 คู่) → <b>ได้ 0.5 คะแนน</b>
+                </li>
+                <li>
+                  แพ้ <b>0-3</b> (ไม่ชนะเลย) → <b>ไม่ได้คะแนน</b>
+                </li>
+                <li>สีที่ชนะคู่สีไม่ได้โบนัสนี้ (ได้คะแนนจากอันดับตามปกติอยู่แล้ว)</li>
+              </ul>
+              <p style={{ margin: "0 0 8px" }}>
+                ใช้เฉพาะ <b>รอบ Page Playoff ทั้ง 4 คู่สี</b> (Qualifier 1 · Eliminator · Qualifier 2 ·
+                ชิงชนะเลิศ) <b>ไม่ใช้กับรอบพบกันหมด</b>
+              </p>
+              <p style={{ margin: 0, color: "var(--muted)" }}>
+                <b>ทำไมถึงมีกติกานี้:</b> รอบ Page Playoff ตัดสินแพ้/ชนะล้วน ๆ พอฝ่ายหนึ่งชนะครบ 2 คู่
+                คู่ที่ 3 ก็จะไม่มีผลต่ออะไรอีก โบนัสนี้ทำให้คู่ที่ 3 ยังมีเดิมพันทั้งสองฝั่ง —
+                ฝั่งที่ตามอยู่เล่นเพื่อคว้า 0.5 คะแนน ฝั่งที่นำอยู่เล่นเพื่อกันไม่ให้อีกฝ่ายได้
+              </p>
+            </div>
+            <p style={{ marginBottom: 0, color: "var(--muted)", fontSize: 13 }}>
+              โบนัสนี้แจกได้มากที่สุด 4 ครั้ง (คู่สีละครั้ง) คะแนนรวมทั้งงานจึงอยู่ระหว่าง 37.0 ถึง 39.0
+              ขึ้นกับผลการแข่งขัน — ในหน้า <b>คะแนนสี</b> โบนัสจะแสดงแยกบรรทัดให้เห็นที่มาชัดเจน
             </p>
           </article>
 

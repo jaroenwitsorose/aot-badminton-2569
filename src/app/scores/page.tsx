@@ -2,13 +2,19 @@
 
 import { useSnapshot } from "@/components/snapshot-provider";
 import { SectionHeading } from "@/components/ui";
-
-const MAX_POINTS = 37;
+import {
+  BASE_TOTAL_POINTS,
+  MAX_TOTAL_POINTS,
+  PLAYOFF_CONSOLATION_POINTS,
+} from "@/lib/engine/scoring-constants";
 
 export default function ScoresPage() {
   const { snapshot } = useSnapshot();
   const { teamTotals } = snapshot;
   const awarded = teamTotals.reduce((s, t) => s + t.points, 0);
+  // แถบเทียบกับสีที่นำอยู่ ไม่ใช่เทียบกับคะแนนรวมทั้งงาน
+  // (37 คือยอดที่ 4 สีแบ่งกัน สีเดียวไม่มีทางได้ครบ ถ้าหารด้วย 37 ทุกแถบจะสั้นเท่ากันหมด)
+  const leader = Math.max(1, ...teamTotals.map((t) => t.points));
 
   return (
     <main>
@@ -17,8 +23,9 @@ export default function ScoresPage() {
           <p className="eyebrow">COLOR STANDINGS</p>
           <h1>คะแนนสี</h1>
           <p>
-            คะแนนรวมสูงสุดต่อสีคือ {MAX_POINTS} คะแนน · แจกไปแล้ว {awarded} คะแนน ·
-            เกณฑ์ตัดสินเมื่อคะแนนเท่ากัน: เหรียญทอง &gt; เหรียญเงิน &gt; เหรียญทองแดง
+            คะแนนหลัก {BASE_TOTAL_POINTS} คะแนน แบ่งกันระหว่าง 4 สี · บวกโบนัสปลอบใจมือทั่วไปได้อีกไม่เกิน{" "}
+            {MAX_TOTAL_POINTS - BASE_TOTAL_POINTS} คะแนน (คู่สีละ {PLAYOFF_CONSOLATION_POINTS}) ·
+            แจกไปแล้ว {awarded} คะแนน · เกณฑ์ตัดสินเมื่อคะแนนเท่ากัน: เหรียญทอง &gt; เหรียญเงิน &gt; เหรียญทองแดง
           </p>
         </div>
       </section>
@@ -35,10 +42,10 @@ export default function ScoresPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 6 }}>
                   <b className="tabular">{t.points}</b>
-                  <span style={{ color: "var(--faint)", fontSize: 13 }}>/ {MAX_POINTS}</span>
+                  <span style={{ color: "var(--faint)", fontSize: 13 }}>คะแนน</span>
                 </div>
                 <div className="score-meter">
-                  <div style={{ width: `${(t.points / MAX_POINTS) * 100}%`, background: t.colorHex }} />
+                  <div style={{ width: `${(t.points / leader) * 100}%`, background: t.colorHex }} />
                 </div>
                 <p className="medals" style={{ margin: "12px 0 0" }}>
                   ทอง {t.gold} · เงิน {t.silver} · ทองแดง {t.bronze}

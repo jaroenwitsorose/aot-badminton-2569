@@ -5,12 +5,15 @@
  *   1. แปลง "ที่มาของคู่" (SEED / GROUP / GROUP_RANK / WINNER / LOSER / LINEUP) เป็น pair_uid จริง
  *   2. คิดอันดับรอบแบ่งกลุ่ม (มือ D / มือ C) และอันดับสีรอบพบกันหมด (มือทั่วไป)
  *   3. ตัดสินผลคู่สีของมือทั่วไป (ชนะ 2 ใน 3 และต้องแข่งครบ 3)
- *   4. ออกคะแนนสีตามกติกา (รวมสูงสุด 37 คะแนน)
+ *   4. ออกคะแนนสีตามกติกา (คะแนนหลัก 37 + โบนัสปลอบใจ Page Playoff ตามผล)
  *
  * ลำดับ match_no เป็น topological order อยู่แล้ว (ตรวจแล้วว่าไม่มีแมตช์ไหนอ้างถึงแมตช์ที่ยังไม่แข่ง)
  * จึงคำนวณจบได้ใน pass เดียว
  */
 
+import {
+  PLAYOFF_CONSOLATION_RESULT,
+} from "./scoring-constants";
 import type {
   EngineLineup,
   EngineMatch,
@@ -580,6 +583,7 @@ function buildTieResult(
 
   return {
     tieId: tie.tieId,
+    phase: tie.phase,
     teamACode: a.teamCode,
     teamBCode: b.teamCode,
     pendingLabelA: a.label,
@@ -681,6 +685,16 @@ function computeScoreEvents(
   const q2 = [...ties.values()].find((t) => t.tieId === "L4-T09");
   if (q2?.status === "COMPLETED" && q2.loserTeamCode) {
     pushTeam(events, rules, warnings, "LEVEL4", "TEAM", "อันดับ 3", q2.loserTeamCode, q2.tieId);
+  }
+
+  // โบนัสปลอบใจ: สีที่แพ้คู่สีรอบ Page Playoff แต่ยังชนะได้อย่างน้อย 1 คู่
+  // ทำให้คู่ที่ 3 ยังมีเดิมพัน แม้ผลแพ้ชนะของคู่สีจะตัดสินไปแล้วตั้งแต่คู่ที่ 2
+  for (const tie of ties.values()) {
+    if (tie.phase !== "PAGE_PLAYOFF" || tie.status !== "COMPLETED") continue;
+    if (!tie.loserTeamCode) continue;
+    const loserWins = tie.loserTeamCode === tie.teamACode ? tie.matchWinsA : tie.matchWinsB;
+    if (loserWins < 1) continue;
+    pushTeam(events, rules, warnings, "LEVEL4", "TEAM", PLAYOFF_CONSOLATION_RESULT, tie.loserTeamCode, tie.tieId);
   }
 
   return events;

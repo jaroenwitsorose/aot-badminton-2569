@@ -2,7 +2,7 @@
  * จำลองการแข่งขันครบทั้ง 158 แมตช์แบบไม่ต้องต่อฐานข้อมูล
  *
  * ตรงกับรายการ Checklist: "จำลองครบ 158 แมตช์แล้วคืนค่าก่อนแข่ง"
- * ใช้ตรวจว่าเอนจินคลี่สายได้ครบทุกช่อง ออกคะแนนสีถูก และรวมได้ 37 คะแนนพอดี
+ * ใช้ตรวจว่าเอนจินคลี่สายได้ครบทุกช่อง ออกคะแนนสีถูก และยอดรวมตรงกับกติกา
  *
  *   npm run simulate            # เมล็ดสุ่มค่าเริ่มต้น
  *   npm run simulate -- 12345   # กำหนดเมล็ดสุ่มเอง (ผลซ้ำได้)
@@ -21,6 +21,12 @@ import type {
   TeamCode,
 } from "../src/lib/engine/types";
 import { buildEngineStateFromSeed, loadSeedFile } from "../src/lib/seed-data";
+import {
+  BASE_TOTAL_POINTS,
+  PLAYOFF_CONSOLATION_POINTS,
+  PLAYOFF_CONSOLATION_RESULT,
+  PLAYOFF_TIE_COUNT,
+} from "../src/lib/engine/scoring-constants";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const seedPath = path.join(here, "..", "data", "seed-data.json");
@@ -98,7 +104,9 @@ function main(): void {
   }
 
   const lineups: EngineLineup[] = [];
-  const walkoverMatchNo = 60; // ทดสอบเส้นทาง walkover หนึ่งแมตช์
+  // ทดสอบเส้นทาง walkover หนึ่งแมตช์ — อ้างด้วย matchUid ซึ่งเป็นคีย์ถาวร
+  // (เลขแมตช์เรียงใหม่ได้เมื่อจัดตารางใหม่ ใช้อ้างอิงในเทสต์ไม่ได้)
+  const walkoverMatchUid = "MATCH-0060";
   let rounds = 0;
 
   for (;;) {
@@ -135,7 +143,7 @@ function main(): void {
 
     for (const m of playable) {
       const match = matchByUid.get(m.matchUid)!;
-      if (match.matchNo === walkoverMatchNo) {
+      if (match.matchUid === walkoverMatchUid) {
         match.status = "WALKOVER";
         match.walkover = true;
         match.walkoverSide = "B";
@@ -183,11 +191,29 @@ function main(): void {
     ),
   );
 
+  // โบนัสปลอบใจแจกตามผล จึงตรวจว่า "คะแนนหลัก 37 + โบนัสที่แจกจริง" ตรงกัน
   const totalPoints = out.teamTotals.reduce((s, t) => s + t.points, 0);
+  const consolationAwards = out.scoreEvents.filter((e) => e.result === PLAYOFF_CONSOLATION_RESULT);
+  const expected = BASE_TOTAL_POINTS + consolationAwards.length * PLAYOFF_CONSOLATION_POINTS;
   check(
-    "คะแนนสีที่แจกออกไปรวมได้ 37 คะแนนพอดี",
-    Math.abs(totalPoints - 37) < 1e-9,
-    `ได้ ${totalPoints}`,
+    `คะแนนสีรวม = คะแนนหลัก ${BASE_TOTAL_POINTS} + โบนัสปลอบใจ ${consolationAwards.length} ครั้ง`,
+    Math.abs(totalPoints - expected) < 1e-9,
+    `ได้ ${totalPoints} ควรเป็น ${expected}`,
+  );
+  check(
+    `โบนัสปลอบใจแจกไม่เกิน ${PLAYOFF_TIE_COUNT} ครั้ง (คู่สี Playoff มี ${PLAYOFF_TIE_COUNT} ชุด)`,
+    consolationAwards.length <= PLAYOFF_TIE_COUNT,
+    `แจก ${consolationAwards.length} ครั้ง`,
+  );
+  check(
+    "โบนัสปลอบใจแจกให้สีที่แพ้คู่สีแต่ชนะได้อย่างน้อย 1 คู่เท่านั้น",
+    consolationAwards.every((e) => {
+      const tie = out.ties.get(e.sourceRef);
+      if (!tie || tie.phase !== "PAGE_PLAYOFF" || tie.loserTeamCode !== e.teamCode) return false;
+      const wins = tie.loserTeamCode === tie.teamACode ? tie.matchWinsA : tie.matchWinsB;
+      return wins >= 1 && wins < 2;
+    }),
+    consolationAwards.map((e) => `${e.teamCode}@${e.sourceRef}`).join(", "),
   );
 
   const gold = out.teamTotals.reduce((s, t) => s + t.gold, 0);
@@ -220,7 +246,7 @@ function main(): void {
     out.level4Standings.length === 4 && out.level4Standings.every((r) => r.rank !== null),
   );
 
-  const wo = out.matches.get(matchByUid.get("MATCH-0060")!.matchUid)!;
+  const wo = out.matches.get(walkoverMatchUid)!;
   check(
     "แมตช์ walkover ตัดสินให้ฝั่งที่มาแข่งชนะ 21-0, 21-0",
     wo.decided && wo.winnerSide === "A" && wo.pointsForA === 42 && wo.pointsForB === 0,

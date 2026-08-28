@@ -18,7 +18,9 @@
     "simulate": "tsx scripts/simulate.ts",
     "db:reset-results": "tsx scripts/reset-demo-data.ts",
     "verify:path": "tsx scripts/verify-path.ts",
-    "verify:excel": "tsx scripts/verify-excel.ts"
+    "verify:excel": "tsx scripts/verify-excel.ts",
+    "verify:schedule": "tsx scripts/verify-schedule.ts",
+    "reschedule": "tsx scripts/reschedule.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

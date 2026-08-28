@@ -168,6 +168,8 @@ export interface StandingRow {
 
 export interface TieResult {
   tieId: string;
+  /** รอบพบกันหมด หรือ Page Playoff — โบนัสปลอบใจให้เฉพาะ Page Playoff */
+  phase: Phase;
   teamACode: TeamCode | null;
   teamBCode: TeamCode | null;
   pendingLabelA: string;
