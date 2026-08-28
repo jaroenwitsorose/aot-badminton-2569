@@ -346,6 +346,14 @@ button { cursor: pointer; }
 .bracket-tree-col-third { justify-content: flex-end; }
 .bracket-tree-col-third .bracket-tree-col-inner { flex: none; }
 .bracket-tree-card { display: block; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 9px; box-shadow: var(--shadow-card); }
+/* หัวข้อบนกล่อง — บอกรอบและประเภท ไม่ให้หลงตอนเลื่อนดูผังที่กว้างกว่าจอ */
+.bracket-tree-head {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  padding: 0 2px 7px; margin-bottom: 7px; border-bottom: 1px solid var(--line);
+}
+.bracket-tree-head b { font-size: 12px; font-weight: 800; color: var(--navy); }
+.bracket-tree-head span { font-size: 11px; color: var(--muted); }
+
 .bracket-tree-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--faint); margin-bottom: 7px; }
 .bracket-tree-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 9px; border-left: 3px solid var(--line); border-radius: 8px; background: #f7f9fc; font-size: 13px; margin-bottom: 5px; }
 .bracket-tree-row:last-child { margin-bottom: 0; }
@@ -354,10 +362,10 @@ button { cursor: pointer; }
 .bracket-tree-row b { flex: none; }
 
 
-/* ── สายการแข่งขัน: แถบบอกรอบ + รายการรายรอบสำหรับมือถือ ─────────────────
- * เดิมมีแต่ผังแบบเชื่อมเส้นซึ่งกว้างกว่าจอมือถือมาก ผู้ใช้ต้องเลื่อนซ้ายขวา
- * แล้วหัวข้อรอบก็เลื่อนหายไปด้วย จึงดูไม่ออกว่าตอนนี้แข่งถึงรอบไหน
- * แก้สองชั้น: แถบสรุปรอบไว้บนสุด (เห็นทุกขนาดจอ) และรายการรายรอบแทนผังบนมือถือ
+/* ── สายการแข่งขัน: แถบสรุปว่าแข่งถึงรอบไหนแล้ว ──────────────────────────
+ * ผังแบบเชื่อมเส้นกว้างกว่าจอมือถือ พอเลื่อนซ้ายขวาแล้วหัวคอลัมน์เลื่อนหายไปด้วย
+ * จึงดูไม่ออกว่าตอนนี้แข่งถึงรอบไหน แถบนี้สรุปไว้บนสุดให้เห็นได้ทันทีทุกขนาดจอ
+ * (อีกชั้นหนึ่งคือหัวข้อบนกล่องแต่ละใบ ดู .bracket-tree-head)
  */
 .bracket-block { display: grid; gap: 16px; min-width: 0; }
 
@@ -382,18 +390,7 @@ button { cursor: pointer; }
 .bracket-step.current { box-shadow: 0 0 0 2px var(--blue-soft); border-color: var(--blue); }
 .bracket-step.current .bracket-step-body b { color: var(--blue); font-weight: 800; }
 
-.bracket-round-list { display: none; }
-.bracket-round-group { border: 1px solid var(--line); border-radius: 16px; background: #fff; overflow: hidden; }
-.bracket-round-group > header {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 11px 14px; background: #f7f9fc; border-bottom: 1px solid var(--line);
-}
-.bracket-round-group > header b { font-size: 14px; }
-.bracket-round-state { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #eef2f7; color: var(--muted); white-space: nowrap; }
-.bracket-round-state.done { background: #e9f7ee; color: #14663a; }
-.bracket-round-state.playing { background: #fff5da; color: #8a6a00; }
-.bracket-round-cards { display: grid; gap: 10px; padding: 12px; }
-.bracket-round-cards .bracket-tree-card { box-shadow: none; }
+
 
 /*
  * ตัวห่อ section ของหน้าสายการแข่งขัน — ใช้ display:grid เรียง section แนวตั้ง
@@ -538,9 +535,6 @@ footer.site-footer a { color: #cfe0f4; }
   .inline-heading { align-items: flex-start; gap: 10px; flex-direction: column; }
   .detail-card { padding: 16px; }
   .team-tie { padding: 12px; }
-  /* มือถือดูผังแบบเชื่อมเส้นไม่ไหว ใช้รายการรายรอบแทน จะได้ไม่ต้องเลื่อนซ้ายขวา */
-  .bracket-tree-scroll { display: none; }
-  .bracket-round-list { display: grid; gap: 14px; }
   .bracket-steps { gap: 6px; }
   .bracket-step { padding: 8px 12px 8px 10px; }
   .bracket-tree-columns { gap: 28px; }

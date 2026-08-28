@@ -50,10 +50,6 @@ export function BracketTree({ rounds, thirdPlace }: { rounds: BracketRound[]; th
   const containerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<string, HTMLAnchorElement>());
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
-  // การ์ดในรายการมือถือใช้ ref คนละชุดกับผัง มิฉะนั้นการ์ดใบหลังจะเขียนทับ ref
-  // แล้วเส้นเชื่อมในผังจะไปวัดตำแหน่งจากการ์ดในรายการแทน ทำให้เส้นเพี้ยนทั้งหมด
-  const listRefs = useRef(new Map<string, HTMLAnchorElement>());
-  const listRowRefs = useRef(new Map<string, HTMLDivElement>());
   const [lines, setLines] = useState<ConnectorLine[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
@@ -183,28 +179,6 @@ export function BracketTree({ rounds, thirdPlace }: { rounds: BracketRound[]; th
         ))}
       </ol>
 
-      {/* มือถือ: ไล่ดูทีละรอบจากบนลงล่าง ไม่ต้องเลื่อนซ้ายขวา */}
-      <div className="bracket-round-list">
-        {[...rounds, ...(thirdPlace ? [{ title: "ชิงอันดับ 3", matches: [thirdPlace] }] : [])].map((round) => {
-          const st = roundState(round.matches);
-          return (
-            <section className={`bracket-round-group ${st.state}`} key={round.title}>
-              <header>
-                <b>{round.title}</b>
-                <span className={`bracket-round-state ${st.state}`}>
-                  {st.state === "done" ? `จบแล้ว ${st.total} แมตช์` : `${st.done}/${st.total} · ${STATE_TH[st.state]}`}
-                </span>
-              </header>
-              <div className="bracket-round-cards">
-                {round.matches.map((m) => (
-                  <BracketTreeCard key={m.matchUid} match={m} cardRefs={listRefs} rowRefs={listRowRefs} />
-                ))}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-
     <div className="bracket-tree-scroll" ref={containerRef}>
       <svg className="bracket-tree-svg" width={size.w} height={size.h} aria-hidden>
         {lines.map((l) => (
@@ -259,6 +233,16 @@ function BracketTreeCard({
 }) {
   const nameOf = (side: MatchView["sideA"]) => side.pair?.label ?? side.pendingLabel;
 
+  /**
+   * หัวข้อบนกล่อง: บอกว่ากล่องนี้คือรอบไหนและประเภทอะไร
+   * ผังกว้างกว่าจอ พอเลื่อนไปกลางผังแล้วหัวคอลัมน์เลื่อนหายไปด้วย
+   * ถ้าไม่มีหัวข้อบนกล่องจะไม่รู้เลยว่ากำลังดูรอบอะไรอยู่
+   * มือ D / มือ C รอบน็อกเอาต์ไม่ผูกประเภท จึงบอกสายบน/สายล่างแทน
+   */
+  const kind =
+    match.eventNameTh ??
+    (match.bracket === "UPPER" ? "สายบน" : match.bracket === "LOWER" ? "สายล่าง" : null);
+
   return (
     <Link
       href={`/results/${match.matchUid}`}
@@ -268,6 +252,11 @@ function BracketTreeCard({
         else cardRefs.current.delete(match.matchUid);
       }}
     >
+      <div className="bracket-tree-head">
+        <b>{match.roundLabel}</b>
+        {kind ? <span>{kind}</span> : null}
+      </div>
+
       <div className="bracket-tree-meta">
         <span>#{match.matchNo}</span>
         <StatusChip status={match.status} walkover={match.walkover} />
