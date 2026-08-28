@@ -271,37 +271,161 @@ for (let r = 2; r <= list.rowCount; r += 1) {
   [1, 3, 4, 5].forEach((c) => (list.getRow(r).getCell(c).alignment = { horizontal: "center", vertical: "middle" }));
 }
 
-// ───────────────────────── 3. ผังคอร์ต ─────────────────────────
-const grid = wb.addWorksheet("ผังคอร์ต");
+// ───────────────────────── 3. ผังคอร์ต (แบบติดบอร์ด) ─────────────────────────
+//
+// ชีตนี้ทำมาเพื่อ "พิมพ์ติดบอร์ดหน้างาน" โดยเฉพาะ จึงใช้สีแยกประเภทแทนการอ่านตัวหนังสือ
+// ผู้เล่นมองปราดเดียวต้องเจอคอร์ตกับเวลาของตัวเอง ไม่ต้องไล่อ่านทีละบรรทัด
+
+/** สีประจำแต่ละประเภท — เลือกให้อ่อนพอที่ตัวหนังสือสีเข้มยังชัดเมื่อพิมพ์ขาวดำ */
+const FILL: Record<string, string> = {
+  "LEVEL1:MD": "FFD9EAD3", // เขียวอ่อน
+  "LEVEL1:WD": "FFFADCE8", // ชมพูอ่อน
+  "LEVEL1:XD": "FFE4E4E4", // เทาอ่อน
+  LEVEL2: "FFCFE2F3", // ฟ้าอ่อน
+  LEVEL3: "FFFCE5D6", // ส้มอ่อน
+  LEVEL4: "FFFDE9A9", // เหลืองทอง
+};
+const fillOf = (m: Match) =>
+  m.levelCode === "LEVEL1" ? FILL[`LEVEL1:${m.eventType}`] : FILL[m.levelCode];
+
+const tieOfId = new Map(seed.ties.map((t) => [t.tieId, t]));
+
+/** ข้อความสองบรรทัดในช่อง: บรรทัดบนบอกว่าใครแข่ง บรรทัดล่างบอกรอบ */
+function cellText(m: Match): string {
+  if (m.levelCode === "LEVEL4" && m.tieId) {
+    const t = tieOfId.get(m.tieId)!;
+    const team = (x: string) =>
+      TEAM_TH[x] ??
+      (/^RANK[1-4]$/.test(x)
+        ? `สีอันดับ ${x.slice(4)}`
+        : x.replace("WINNER_T", "ผู้ชนะคู่สี ").replace("LOSER_T", "ผู้แพ้คู่สี "));
+    const stage = t.phase === "ROUND_ROBIN" ? t.stage.replace("คู่สีที่", "คู่สีที่") : t.stage;
+    return `#${m.matchNo}  มือทั่วไป · ${team(t.teamASource)} พบ ${team(t.teamBSource)}
+${stage} · คู่ที่ ${m.tieOrderNo}`;
+  }
+  const ev = m.eventType ? ` · ${EVENT_TH[m.eventType]}` : "";
+  return `#${m.matchNo}  ${L(m.levelCode)}${ev}
+${m.roundLabel}`;
+}
+
+const grid = wb.addWorksheet("ผังคอร์ต", {
+  pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 },
+  views: [{ state: "frozen", ySplit: 0 }],
+});
 const courts = [...new Set(M.map((m) => m.courtNo))].sort((a, b) => a - b);
-header(grid, [
-  { header: "วัน", width: 10 },
-  { header: "เวลา", width: 13 },
-  ...courts.map((c) => ({ header: `คอร์ต ${c}`, width: 30 })),
+const lastCol = 1 + courts.length;
+grid.columns = [{ width: 14 }, ...courts.map(() => ({ width: 32 }))];
+
+const colLetter = (i: number) => grid.getColumn(i).letter;
+function banner(text: string, bg: string, fg: string, size: number, height: number) {
+  const row = grid.addRow([text]);
+  grid.mergeCells(`${colLetter(1)}${row.number}:${colLetter(lastCol)}${row.number}`);
+  const cell = row.getCell(1);
+  cell.value = text;
+  cell.font = { bold: true, size, color: { argb: fg } };
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+  cell.alignment = { horizontal: "center", vertical: "middle" };
+  row.height = height;
+  return row;
+}
+
+banner(seed.tournament.titleTh, NAVY, "FFFFFFFF", 16, 34);
+banner(
+  `${M.length} แมตช์ · ${seed.levels.length} ระดับมือ · 4 สี · ${seed.pairs.length} คู่ · ` +
+    `ช่องละ 30 นาที · ${courts.length} คอร์ต` +
+    (seed.tournament.venue ? ` · สถานที่ ${seed.tournament.venue}` : ""),
+  "FF1768C5",
+  "FFFFFFFF",
+  11,
+  20,
+);
+
+// แถบอธิบายสี — ต้องมี ไม่งั้นสีบนกระดาษไม่มีความหมาย
+const legendRow = grid.addRow([
+  "คำอธิบายสี",
+  ...["มือใหม่ ชายคู่", "มือใหม่ หญิงคู่", "มือใหม่ คู่ผสม", "มือ D", "มือ C"].slice(0, courts.length),
 ]);
+legendRow.height = 20;
+const legendFills = ["", FILL["LEVEL1:MD"], FILL["LEVEL1:WD"], FILL["LEVEL1:XD"], FILL.LEVEL2, FILL.LEVEL3];
+legendRow.eachCell({ includeEmpty: true }, (cell, i) => {
+  cell.font = { bold: true, size: 10 };
+  cell.alignment = { horizontal: "center", vertical: "middle" };
+  if (legendFills[i - 1]) {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: legendFills[i - 1] } };
+  }
+  cell.border = { top: { style: "thin", color: { argb: LINE } }, bottom: { style: "thin", color: { argb: LINE } }, left: { style: "thin", color: { argb: LINE } }, right: { style: "thin", color: { argb: LINE } } };
+});
+const legend2 = grid.addRow(["", "มือทั่วไป (ทีมสี)"]);
+legend2.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: FILL.LEVEL4 } };
+legend2.getCell(2).font = { bold: true, size: 10 };
+legend2.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
+legend2.getCell(2).border = { top: { style: "thin", color: { argb: LINE } }, bottom: { style: "thin", color: { argb: LINE } }, left: { style: "thin", color: { argb: LINE } }, right: { style: "thin", color: { argb: LINE } } };
+legend2.height = 20;
+
 for (const d of days) {
-  const times = [...new Set(M.filter((m) => m.dayNo === d).map((m) => m.startTime))].sort();
+  grid.addRow([]).height = 8;
+
+  const inDay = M.filter((m) => m.dayNo === d);
+  const first = inDay.reduce((a, b) => (a.startTime < b.startTime ? a : b)).startTime;
+  const last = inDay.reduce((a, b) => (a.endTime > b.endTime ? a : b)).endTime;
+  banner(`วันแข่งขันที่ ${d}   (${first}–${last} น. · ${courts.length} คอร์ต)`, NAVY, "FFFFFFFF", 13, 26);
+
+  const head = grid.addRow(["เวลา", ...courts.map((c) => `คอร์ตที่ ${c}`)]);
+  head.height = 22;
+  head.eachCell((cell) => {
+    cell.font = { bold: true, size: 12 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+  });
+
+  const times = [...new Set(inDay.map((m) => m.startTime))].sort();
   for (const t of times) {
-    const inSlot = M.filter((m) => m.dayNo === d && m.startTime === t);
-    const end = inSlot[0].endTime;
-    grid.addRow([
-      `วันที่ ${d}`,
-      `${t}–${end}`,
+    const inSlot = inDay.filter((m) => m.startTime === t);
+    const row = grid.addRow([
+      `${t}-${inSlot[0].endTime}`,
       ...courts.map((c) => {
         const m = inSlot.find((x) => x.courtNo === c);
-        if (!m) return "";
-        const ev = m.eventType ? ` ${EVENT_TH[m.eventType]}` : "";
-        return `#${m.matchNo} ${L(m.levelCode)}${ev}\n${m.roundLabel}`;
+        return m ? cellText(m) : "ว่าง";
       }),
     ]);
+    row.height = 34;
+    row.eachCell({ includeEmpty: true }, (cell, i) => {
+      cell.border = {
+        top: { style: "thin", color: { argb: LINE } },
+        bottom: { style: "thin", color: { argb: LINE } },
+        left: { style: "thin", color: { argb: LINE } },
+        right: { style: "thin", color: { argb: LINE } },
+      };
+      if (i === 1) {
+        cell.font = { bold: true, size: 11 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
+        return;
+      }
+      const m = inSlot.find((x) => x.courtNo === courts[i - 2]);
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      if (!m) {
+        cell.font = { size: 10, italic: true, color: { argb: "FFAAAAAA" } };
+        return;
+      }
+      cell.font = { size: 10, color: { argb: "FF1A1A1A" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fillOf(m) } };
+    });
   }
-}
-zebra(grid, 1);
-for (let r = 2; r <= grid.rowCount; r += 1) {
-  grid.getRow(r).height = 30;
-  grid.getRow(r).eachCell({ includeEmpty: true }, (cell, i) => {
-    cell.alignment = { wrapText: true, vertical: "middle", horizontal: i <= 2 ? "center" : "left" };
-    if (i > 2) cell.font = { size: 10 };
+
+  // แถวสำรองท้ายวัน — เผื่อแมตช์ยืดหรือมีเหตุให้เลื่อน
+  const reserve = grid.addRow(["สำรอง", ...courts.map(() => "สำรอง")]);
+  reserve.height = 24;
+  reserve.eachCell({ includeEmpty: true }, (cell) => {
+    cell.font = { size: 10, italic: true, color: { argb: "FF999999" } };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = {
+      top: { style: "thin", color: { argb: LINE } },
+      bottom: { style: "thin", color: { argb: LINE } },
+      left: { style: "thin", color: { argb: LINE } },
+      right: { style: "thin", color: { argb: LINE } },
+    };
   });
 }
 
