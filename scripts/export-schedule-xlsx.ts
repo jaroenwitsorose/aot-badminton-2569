@@ -3,6 +3,9 @@
  *
  *   npm run export:schedule                 → ได้ไฟล์ในโฟลเดอร์ปัจจุบัน
  *   npm run export:schedule -- <ที่อยู่ไฟล์> → กำหนดที่เก็บเอง
+ *
+ * ไฟล์จะได้ชื่อลงท้าย -v1, -v2, -v3 ... ไล่ขึ้นเสมอ ไม่เขียนทับของเดิม
+ * (ใส่ --overwrite ถ้าอยากเขียนทับชื่อที่ระบุจริง ๆ)
  *   npm run export:schedule -- <ไฟล์> --compare <ตารางเก่า.json>
  *        → เพิ่มชีตเทียบก่อน/หลังให้ด้วย
  *
@@ -11,7 +14,8 @@
  */
 
 import ExcelJS from "exceljs";
-import { readFileSync } from "node:fs";
+import { validateXlsx } from "./validate-xlsx";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -19,7 +23,30 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const compareIdx = args.indexOf("--compare");
 const comparePath = compareIdx >= 0 ? args[compareIdx + 1] : null;
-const outPath = args.find((a) => a.endsWith(".xlsx")) ?? "ตารางแข่งขันแบดมินตัน-ทอท-2569.xlsx";
+/**
+ * ตั้งชื่อไฟล์แบบมีเวอร์ชัน ไม่เขียนทับไฟล์เดิมเด็ดขาด
+ *
+ * เหตุผล: ไฟล์ที่แจกออกไปแล้วต้องอ้างอิงย้อนหลังได้ว่าใครถือเวอร์ชันไหน
+ * และถ้าเผลอสร้างทับตอนที่ไฟล์เปิดค้างอยู่ใน Excel จะเขียนไม่ได้ (EBUSY)
+ */
+function versionedPath(requested: string): string {
+  const dir = path.dirname(requested);
+  const ext = path.extname(requested) || ".xlsx";
+  const base = path.basename(requested, ext).replace(/-v\d+$/, "");
+  const prefix = `${base}-v`;
+  let next = 1;
+  if (existsSync(dir)) {
+    for (const f of readdirSync(dir)) {
+      if (!f.startsWith(prefix) || !f.endsWith(ext)) continue;
+      const n = Number(f.slice(prefix.length, f.length - ext.length));
+      if (Number.isInteger(n) && n >= next) next = n + 1;
+    }
+  }
+  return path.join(dir, `${prefix}${next}${ext}`);
+}
+
+const requested = args.find((a) => a.endsWith(".xlsx")) ?? "ตารางแข่งขันแบดมินตัน-ทอท-2569.xlsx";
+const outPath = args.includes("--overwrite") ? requested : versionedPath(requested);
 
 interface Match {
   matchNo: number;
@@ -308,9 +335,11 @@ ${stage} · คู่ที่ ${m.tieOrderNo}`;
 ${m.roundLabel}`;
 }
 
+// ห้ามใส่ views แบบ frozen ที่นี่ — ชีตนี้มีหัวข้อซ้ำรายวัน ตรึงแถวบนไม่มีประโยชน์
+// และถ้าใส่ frozen โดยไม่มีค่า split จริง exceljs จะเขียน <pane state="frozen"/> เปล่า ๆ
+// ซึ่งผิดสเปก OOXML แล้ว Excel จะฟ้องว่า "พบปัญหากับเนื้อหาบางอย่าง" ตอนเปิดไฟล์
 const grid = wb.addWorksheet("ผังคอร์ต", {
   pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 },
-  views: [{ state: "frozen", ySplit: 0 }],
 });
 const courts = [...new Set(M.map((m) => m.courtNo))].sort((a, b) => a - b);
 const lastCol = 1 + courts.length;
@@ -505,12 +534,22 @@ if (comparePath) {
 // ห่อด้วยฟังก์ชันแทน top-level await เพราะ tsx แปลงเป็น CommonJS แล้วรันโมดูล async ไม่ได้
 async function write() {
   await wb.xlsx.writeFile(outPath);
-  console.log(`
-สร้างไฟล์แล้ว: ${outPath}`);
+
+  // ตรวจไฟล์ก่อนบอกว่าสำเร็จ — เคยส่งไฟล์ที่ Excel เปิดไม่ได้ออกไปมาแล้ว
+  const problems = await validateXlsx(outPath);
+  console.log("");
+  if (problems.length > 0) {
+    console.error("ไฟล์ที่สร้างมีปัญหา ไม่ควรนำไปใช้:");
+    for (const p of problems) console.error(`  x ${p}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`สร้างไฟล์แล้ว: ${outPath}`);
   console.log(
-    `  ${M.length} แมตช์ · ${days.length} วัน · ${courts.length} คอร์ต · ${seed.ties.length} คู่สี
-`,
+    `  ${M.length} แมตช์ · ${days.length} วัน · ${courts.length} คอร์ต · ${seed.ties.length} คู่สี · ตรวจไฟล์ผ่าน`,
   );
+  console.log("");
 }
 
 write();
