@@ -28,6 +28,12 @@ import {
 import { writeAudit, type AuditAction } from "@/lib/audit";
 import { simulateAllResults } from "@/lib/simulator";
 import {
+  applyScheduleImport,
+  previewScheduleImport,
+  summariseForAudit,
+  type SchedulePreview,
+} from "@/lib/schedule-import";
+import {
   validateEventGender,
   validateLineupOrder,
   validateMatchGames,
@@ -1021,5 +1027,62 @@ export async function setSystemFlagsAction(input: {
 
     revalidatePath("/admin/settings");
     return ok("บันทึกแล้ว");
+  });
+}
+
+// ───────────────────────── นำเข้าตารางแข่ง ─────────────────────────
+
+export type PreviewResult =
+  | { ok: true; preview: SchedulePreview }
+  | { ok: false; error: string };
+
+/** ดูก่อนว่าการนำเข้าจะเปลี่ยนอะไรบ้าง — ไม่เขียนอะไรลงฐานข้อมูล */
+export async function previewScheduleImportAction(): Promise<PreviewResult> {
+  try {
+    await requireRole("ADMIN");
+    return { ok: true, preview: await previewScheduleImport() };
+  } catch (error) {
+    if (error instanceof AuthError) return { ok: false, error: error.message };
+    console.error(error);
+    return { ok: false, error: error instanceof Error ? error.message : "ตรวจสอบไม่สำเร็จ" };
+  }
+}
+
+/**
+ * นำเข้าตารางแข่งจากไฟล์ตั้งต้นจริง
+ *
+ * แตะเฉพาะเวลา/คอร์ต/ลำดับแมตช์ และกติกาคะแนน — ไม่แตะรายชื่อ ผลจับสลาก
+ * ซองรายชื่อ หรือผลการแข่งขันที่กรอกไปแล้ว
+ */
+export async function importScheduleAction(input: { confirmText: string }): Promise<ActionResult> {
+  return guarded(async () => {
+    const session = await requireRole("SUPERADMIN");
+    if (input.confirmText.trim() !== "นำเข้าตาราง") {
+      return fail('พิมพ์ข้อความ "นำเข้าตาราง" เพื่อยืนยัน');
+    }
+
+    const before = await previewScheduleImport();
+    if (before.blockers.length > 0) return fail(before.blockers.join(" · "));
+    if (before.upToDate) return ok("ตารางในระบบตรงกับไฟล์ตั้งต้นอยู่แล้ว ไม่มีอะไรต้องนำเข้า");
+
+    const outcome = await applyScheduleImport();
+
+    await writeAudit({
+      actorId: session.adminId,
+      action: "SCHEDULE_IMPORT",
+      entityType: "tournament",
+      entityId: "schedule",
+      before: { matchesMoved: before.moves.length },
+      after: summariseForAudit(before),
+      ...(await meta()),
+    });
+
+    refreshPublicPages();
+    revalidatePath("/admin/scores");
+    revalidatePath("/admin/settings");
+    return ok(
+      `นำเข้าแล้ว — ย้าย ${outcome.matchesUpdated} แมตช์ · ปรับคู่สี ${outcome.tiesUpdated} ชุด` +
+        (outcome.rulesUpserted > 0 ? ` · กติกาคะแนน ${outcome.rulesUpserted} ข้อ` : ""),
+    );
   });
 }

@@ -25,7 +25,8 @@ export type AuditAction =
   | "TIEBREAK_DECISION"
   | "CHECKLIST_UPDATE"
   | "SIMULATION_RUN"
-  | "ADMIN_USER_UPDATE";
+  | "ADMIN_USER_UPDATE"
+  | "SCHEDULE_IMPORT";
 
 interface AuditInput {
   actorId: string;

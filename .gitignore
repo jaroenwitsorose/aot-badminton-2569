@@ -9,3 +9,7 @@ next-env.d.ts
 
 # ชุดโค้ดอ้างอิงที่นำ UI มาใช้ ไม่ใช่ส่วนหนึ่งของแอป
 New folder/
+
+# Vercel CLI
+.vercel
+.env.production.local

@@ -2,10 +2,12 @@ import { requirePage } from "@/lib/page-guard";
 import { prisma } from "@/lib/prisma";
 import { SettingsForm } from "./settings-form";
 import { SystemFlags } from "./system-flags";
+import { ScheduleImport } from "./schedule-import";
 
 export const dynamic = "force-dynamic";
-// จำลองผลครบ 158 แมตช์ทำงานผ่าน server action บนหน้านี้ — ให้เวลาเผื่อไว้มากกว่าปกติ
-export const maxDuration = 30;
+// จำลองผลครบ 158 แมตช์ และนำเข้าตารางใหม่ ทำงานผ่าน server action บนหน้านี้
+// ทั้งคู่แตะข้อมูลหลายร้อยแถว จึงให้เวลาเผื่อไว้มากกว่าปกติ
+export const maxDuration = 60;
 
 export default async function SettingsPage() {
   const session = await requirePage("ADMIN");
@@ -27,6 +29,8 @@ export default async function SettingsPage() {
         publicRefreshMs={tournament.publicRefreshMs}
         days={days.map((d) => ({ dayNo: d.dayNo, labelTemp: d.labelTemp, actualDate: iso(d.actualDate) }))}
       />
+
+      {session.role === "SUPERADMIN" ? <ScheduleImport /> : null}
 
       {session.role === "SUPERADMIN" ? (
         <SystemFlags
