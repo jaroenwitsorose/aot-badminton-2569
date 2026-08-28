@@ -1,0 +1,392 @@
+/**
+ * สร้างไฟล์ Excel สรุปตารางแข่งทั้งหมดจาก data/seed-data.json
+ *
+ *   npm run export:schedule                 → ได้ไฟล์ในโฟลเดอร์ปัจจุบัน
+ *   npm run export:schedule -- <ที่อยู่ไฟล์> → กำหนดที่เก็บเอง
+ *   npm run export:schedule -- <ไฟล์> --compare <ตารางเก่า.json>
+ *        → เพิ่มชีตเทียบก่อน/หลังให้ด้วย
+ *
+ * ไฟล์นี้ไว้แจกผู้เล่นและติดบอร์ดหน้างาน จึงเน้นอ่านง่ายมากกว่านำกลับเข้าระบบ
+ * (ไฟล์สำหรับกรอกข้อมูลกลับเข้าระบบคือคนละไฟล์ อยู่ที่หน้ารายชื่อนักกีฬา)
+ */
+
+import ExcelJS from "exceljs";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const args = process.argv.slice(2);
+const compareIdx = args.indexOf("--compare");
+const comparePath = compareIdx >= 0 ? args[compareIdx + 1] : null;
+const outPath = args.find((a) => a.endsWith(".xlsx")) ?? "ตารางแข่งขันแบดมินตัน-ทอท-2569.xlsx";
+
+interface Match {
+  matchNo: number;
+  matchUid: string;
+  sourceMatchCode: string;
+  dayNo: number;
+  startTime: string;
+  endTime: string;
+  courtNo: number;
+  levelCode: string;
+  eventType: string | null;
+  phase: string;
+  bracket: string;
+  roundLabel: string;
+  groupKey: string | null;
+  tieId: string | null;
+  tieOrderNo: number | null;
+  sideASource: string;
+  sideBSource: string;
+}
+interface Tie {
+  tieId: string;
+  tieNo: number;
+  phase: string;
+  stage: string;
+  dayNo: number;
+  startTime: string;
+  courts: string;
+  teamASource: string;
+  teamBSource: string;
+  matchNos: number[];
+}
+interface Seed {
+  tournament: { titleTh: string; venue: string | null; venueConfirmed: boolean };
+  levels: { levelCode: string; nameTh: string; format: string; eventTypes: string; pairSlots: number }[];
+  pairs: unknown[];
+  participants: unknown[];
+  matches: Match[];
+  ties: Tie[];
+}
+
+const seed = JSON.parse(readFileSync(path.join(here, "..", "data", "seed-data.json"), "utf-8")) as Seed;
+const M = [...seed.matches].sort((a, b) => a.matchNo - b.matchNo);
+const byCode = new Map(M.map((m) => [m.sourceMatchCode, m]));
+
+const LEVEL_TH: Record<string, string> = {
+  LEVEL1: "มือใหม่",
+  LEVEL2: "มือ D",
+  LEVEL3: "มือ C",
+  LEVEL4: "มือทั่วไป",
+};
+const EVENT_TH: Record<string, string> = { MD: "ชายคู่", WD: "หญิงคู่", XD: "คู่ผสม" };
+const TEAM_TH: Record<string, string> = { PUR: "ม่วง", GRN: "เขียว", RED: "แดง", BLU: "น้ำเงิน" };
+const L = (c: string) => LEVEL_TH[c] ?? c;
+
+/**
+ * แปลง "ที่มาของฝั่ง" ให้เป็นภาษาคน
+ * ตอนนี้ยังไม่มีชื่อนักกีฬาจริง ช่องคู่แข่งขันจึงบอกที่มาแทน เช่น "ผู้ชนะนัดที่ 12"
+ * ซึ่งอ่านแล้วรู้ทันทีว่าต้องรอผลนัดไหน — ดีกว่าเว้นว่างหรือใส่รหัสดิบ
+ */
+function sideLabel(src: string): string {
+  const p = src.split(":");
+  switch (p[0]) {
+    case "SEED":
+      return `${L(`LEVEL${p[1][1]}`)} ${EVENT_TH[p[2]] ?? p[2]} · สาย ${Number(p[3])}`;
+    case "GROUP":
+      return `${L(`LEVEL${p[1][1]}`)} · กลุ่ม ${p[2]} คู่ที่ ${p[3].replace("SLOT", "")}`;
+    case "GROUP_RANK":
+      return `${L(`LEVEL${p[1][1]}`)} · อันดับ ${p[3]} กลุ่ม ${p[2]}`;
+    case "WINNER": {
+      const ref = byCode.get(src.slice(7));
+      return ref ? `ผู้ชนะนัดที่ ${ref.matchNo}` : `ผู้ชนะ ${src.slice(7)}`;
+    }
+    case "LOSER": {
+      const ref = byCode.get(src.slice(6));
+      return ref ? `ผู้แพ้นัดที่ ${ref.matchNo}` : `ผู้แพ้ ${src.slice(6)}`;
+    }
+    case "LINEUP": {
+      const [, , , team, order] = p;
+      const no = order.replace("ORDER", "");
+      if (TEAM_TH[team]) return `${TEAM_TH[team]} · คู่ที่ ${no}`;
+      if (/^RANK[1-4]$/.test(team)) return `สีอันดับ ${team.slice(4)} · คู่ที่ ${no}`;
+      const m = /^(WINNER|LOSER)_T(\d+)$/.exec(team);
+      if (m) {
+        const tie = seed.ties.find((t) => t.tieId === `L4-T${m[2]}`);
+        return `${m[1] === "WINNER" ? "ผู้ชนะ" : "ผู้แพ้"} ${tie?.stage ?? `คู่สี ${m[2]}`} · คู่ที่ ${no}`;
+      }
+      return src;
+    }
+    default:
+      return src;
+  }
+}
+
+// ───────────────────────── สไตล์ ─────────────────────────
+const NAVY = "FF061F46";
+const GOLD = "FFF7C948";
+const SOFT = "FFEDF1F7";
+const LINE = "FFCBD5E1";
+
+function header(ws: ExcelJS.Worksheet, cols: { header: string; width: number }[]) {
+  ws.columns = cols.map((c) => ({ width: c.width }));
+  const row = ws.addRow(cols.map((c) => c.header));
+  row.height = 26;
+  row.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  });
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
+}
+
+function zebra(ws: ExcelJS.Worksheet, keyCol = 0) {
+  let last = "";
+  let shade = false;
+  for (let r = 2; r <= ws.rowCount; r += 1) {
+    const row = ws.getRow(r);
+    if (keyCol > 0) {
+      const key = String(row.getCell(keyCol).value ?? "");
+      if (key !== last) {
+        shade = !shade;
+        last = key;
+      }
+    } else {
+      shade = r % 2 === 0;
+    }
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      if (shade) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: SOFT } };
+      cell.border = {
+        top: { style: "hair", color: { argb: LINE } },
+        bottom: { style: "hair", color: { argb: LINE } },
+        left: { style: "hair", color: { argb: LINE } },
+        right: { style: "hair", color: { argb: LINE } },
+      };
+      cell.alignment = { vertical: "middle" };
+    });
+  }
+}
+
+const wb = new ExcelJS.Workbook();
+wb.creator = "AOT Badminton 2569";
+wb.created = new Date();
+
+// ───────────────────────── 1. สรุป ─────────────────────────
+const sum = wb.addWorksheet("สรุป");
+sum.columns = [{ width: 26 }, { width: 18 }, { width: 16 }, { width: 44 }];
+const title = sum.addRow([seed.tournament.titleTh]);
+title.getCell(1).font = { bold: true, size: 15, color: { argb: NAVY } };
+title.height = 26;
+sum.addRow([]);
+
+const days = [...new Set(M.map((m) => m.dayNo))].sort();
+sum.addRow(["ภาพรวม"]).getCell(1).font = { bold: true, size: 12 };
+for (const [k, v] of [
+  ["จำนวนแมตช์ทั้งหมด", `${M.length} แมตช์`],
+  ["จำนวนวันแข่ง", `${days.length} วัน`],
+  ["คอร์ตที่ใช้", `${[...new Set(M.map((m) => m.courtNo))].sort((a, b) => a - b).join(", ")}`],
+  ["คู่แข่งขัน", `${seed.pairs.length} คู่ · นักกีฬา ${seed.participants.length} คน`],
+  ["สถานที่", seed.tournament.venue ?? "ยังไม่กำหนด"],
+  ["วันที่จริง", "ยังไม่กำหนด — ใช้ วันที่ 1/2/3 ไปก่อน"],
+] as [string, string][]) {
+  const r = sum.addRow([k, v]);
+  r.getCell(1).font = { color: { argb: "FF64748B" } };
+  r.getCell(2).font = { bold: true };
+}
+sum.addRow([]);
+
+sum.addRow(["แต่ละวัน"]).getCell(1).font = { bold: true, size: 12 };
+const dh = sum.addRow(["วัน", "เวลา", "จำนวนแมตช์", "คอร์ตที่ใช้"]);
+dh.eachCell((c) => {
+  c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+});
+for (const d of days) {
+  const inDay = M.filter((m) => m.dayNo === d);
+  sum.addRow([
+    `วันที่ ${d}`,
+    `${inDay.reduce((a, b) => (a.startTime < b.startTime ? a : b)).startTime}–${inDay.reduce((a, b) => (a.endTime > b.endTime ? a : b)).endTime}`,
+    inDay.length,
+    [...new Set(inDay.map((m) => m.courtNo))].sort((a, b) => a - b).join(", "),
+  ]);
+}
+sum.addRow([]);
+
+sum.addRow(["แยกตามระดับมือ"]).getCell(1).font = { bold: true, size: 12 };
+const lh = sum.addRow(["ระดับมือ", "จำนวนคู่", "จำนวนแมตช์", "รูปแบบการแข่ง"]);
+lh.eachCell((c) => {
+  c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+});
+for (const lv of seed.levels) {
+  sum.addRow([lv.nameTh, lv.pairSlots, M.filter((m) => m.levelCode === lv.levelCode).length, lv.format]);
+}
+sum.addRow([]);
+
+sum.addRow(["กติกาการจัดตาราง"]).getCell(1).font = { bold: true, size: 12 };
+for (const t of [
+  "มือใหม่: คู่ผสมไม่แข่งพร้อมกับชายคู่/หญิงคู่ เพราะคนหนึ่งลงข้ามประเภทได้",
+  "มือใหม่: ชายคู่กับหญิงคู่ลงพร้อมกันได้ (คนละเพศ) และสองแมตช์ประเภทเดียวกันก็ได้ (คนละคู่)",
+  "มือทั่วไป รอบพบกันหมด: คู่สีหนึ่งลงคู่ที่ 1→2→3 ทีละช่วง ไม่ลงพร้อมกัน 3 คอร์ต",
+  "มือทั่วไป รอบ Page Playoff: ลง 3 คอร์ตพร้อมกันตามเดิม",
+  "ทุกแมตช์ที่ต่อเนื่องกันมีเวลาพักอย่างน้อย 30 นาที",
+  "ช่องคู่แข่งขันที่ยังเป็น \"ผู้ชนะนัดที่ ...\" จะเติมชื่อจริงให้เองเมื่อผลออก",
+]) {
+  const r = sum.addRow([`· ${t}`]);
+  sum.mergeCells(`A${r.number}:D${r.number}`);
+  r.getCell(1).alignment = { wrapText: true, vertical: "middle" };
+  r.height = 18;
+}
+sum.addRow([]);
+sum.addRow([`สร้างเมื่อ ${new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}`]).getCell(1).font = {
+  color: { argb: "FF94A3B8" },
+  size: 10,
+};
+
+// ───────────────────────── 2. ตารางแข่งขัน ─────────────────────────
+const list = wb.addWorksheet("ตารางแข่งขัน");
+header(list, [
+  { header: "นัดที่", width: 8 },
+  { header: "วัน", width: 10 },
+  { header: "เริ่ม", width: 8 },
+  { header: "จบ", width: 8 },
+  { header: "คอร์ต", width: 8 },
+  { header: "ระดับมือ", width: 12 },
+  { header: "ประเภท", width: 10 },
+  { header: "รอบ", width: 34 },
+  { header: "ฝั่ง A", width: 30 },
+  { header: "ฝั่ง B", width: 30 },
+  { header: "รหัสนัด", width: 16 },
+]);
+for (const m of M) {
+  list.addRow([
+    m.matchNo,
+    `วันที่ ${m.dayNo}`,
+    m.startTime,
+    m.endTime,
+    m.courtNo,
+    L(m.levelCode),
+    m.eventType ? EVENT_TH[m.eventType] : "—",
+    m.roundLabel,
+    sideLabel(m.sideASource),
+    sideLabel(m.sideBSource),
+    m.sourceMatchCode,
+  ]);
+}
+zebra(list, 2);
+for (let r = 2; r <= list.rowCount; r += 1) {
+  [1, 3, 4, 5].forEach((c) => (list.getRow(r).getCell(c).alignment = { horizontal: "center", vertical: "middle" }));
+}
+
+// ───────────────────────── 3. ผังคอร์ต ─────────────────────────
+const grid = wb.addWorksheet("ผังคอร์ต");
+const courts = [...new Set(M.map((m) => m.courtNo))].sort((a, b) => a - b);
+header(grid, [
+  { header: "วัน", width: 10 },
+  { header: "เวลา", width: 13 },
+  ...courts.map((c) => ({ header: `คอร์ต ${c}`, width: 30 })),
+]);
+for (const d of days) {
+  const times = [...new Set(M.filter((m) => m.dayNo === d).map((m) => m.startTime))].sort();
+  for (const t of times) {
+    const inSlot = M.filter((m) => m.dayNo === d && m.startTime === t);
+    const end = inSlot[0].endTime;
+    grid.addRow([
+      `วันที่ ${d}`,
+      `${t}–${end}`,
+      ...courts.map((c) => {
+        const m = inSlot.find((x) => x.courtNo === c);
+        if (!m) return "";
+        const ev = m.eventType ? ` ${EVENT_TH[m.eventType]}` : "";
+        return `#${m.matchNo} ${L(m.levelCode)}${ev}\n${m.roundLabel}`;
+      }),
+    ]);
+  }
+}
+zebra(grid, 1);
+for (let r = 2; r <= grid.rowCount; r += 1) {
+  grid.getRow(r).height = 30;
+  grid.getRow(r).eachCell({ includeEmpty: true }, (cell, i) => {
+    cell.alignment = { wrapText: true, vertical: "middle", horizontal: i <= 2 ? "center" : "left" };
+    if (i > 2) cell.font = { size: 10 };
+  });
+}
+
+// ───────────────────────── 4. คู่สีมือทั่วไป ─────────────────────────
+const tieWs = wb.addWorksheet("คู่สีมือทั่วไป");
+header(tieWs, [
+  { header: "คู่สีที่", width: 9 },
+  { header: "รอบ", width: 30 },
+  { header: "สี", width: 24 },
+  { header: "วัน", width: 10 },
+  { header: "เวลา", width: 22 },
+  { header: "คอร์ต", width: 10 },
+  { header: "นัดที่", width: 18 },
+]);
+for (const t of [...seed.ties].sort((a, b) => a.tieNo - b.tieNo)) {
+  const ms = t.matchNos.map((n) => M.find((m) => m.matchNo === n)!).sort((a, b) => a.matchNo - b.matchNo);
+  const teamText = (s: string) =>
+    TEAM_TH[s] ?? (/^RANK[1-4]$/.test(s) ? `สีอันดับ ${s.slice(4)}` : s.replace("WINNER_T", "ผู้ชนะคู่สี ").replace("LOSER_T", "ผู้แพ้คู่สี "));
+  tieWs.addRow([
+    t.tieNo,
+    t.stage,
+    `${teamText(t.teamASource)} พบ ${teamText(t.teamBSource)}`,
+    `วันที่ ${t.dayNo}`,
+    [...new Set(ms.map((m) => m.startTime))].sort().join(" · "),
+    t.courts,
+    ms.map((m) => `#${m.matchNo}`).join(" "),
+  ]);
+}
+zebra(tieWs, 0);
+
+// ───────────────────────── 5. เทียบก่อน/หลัง (ถ้าสั่ง) ─────────────────────────
+if (comparePath) {
+  const oldSeed = JSON.parse(readFileSync(comparePath, "utf-8")) as Seed;
+  const oldByUid = new Map(oldSeed.matches.map((m) => [m.matchUid, m]));
+  const cmp = wb.addWorksheet("เทียบก่อน-หลัง");
+  header(cmp, [
+    { header: "นัดที่ (เดิม → ใหม่)", width: 20 },
+    { header: "ระดับมือ", width: 12 },
+    { header: "ประเภท", width: 10 },
+    { header: "รอบ", width: 32 },
+    { header: "เดิม", width: 26 },
+    { header: "ใหม่", width: 26 },
+    { header: "เปลี่ยนอะไร", width: 24 },
+  ]);
+  const slot = (m: Match) => `วันที่ ${m.dayNo} · ${m.startTime} · คอร์ต ${m.courtNo}`;
+  let changed = 0;
+  for (const m of M) {
+    const o = oldByUid.get(m.matchUid);
+    if (!o) continue;
+    const dayT = o.dayNo !== m.dayNo;
+    const timeT = o.startTime !== m.startTime;
+    const courtT = o.courtNo !== m.courtNo;
+    if (!dayT && !timeT && !courtT && o.matchNo === m.matchNo) continue;
+    changed += 1;
+    const what = [dayT && "ย้ายวัน", !dayT && timeT && "ย้ายเวลา", courtT && "ย้ายคอร์ต"].filter(Boolean).join(" · ");
+    cmp.addRow([
+      `#${o.matchNo} → #${m.matchNo}`,
+      L(m.levelCode),
+      m.eventType ? EVENT_TH[m.eventType] : "—",
+      m.roundLabel,
+      slot(o),
+      slot(m),
+      what || "เปลี่ยนแค่เลขนัด",
+    ]);
+  }
+  zebra(cmp, 2);
+  for (let r = 2; r <= cmp.rowCount; r += 1) {
+    const cell = cmp.getRow(r).getCell(6);
+    cell.font = { bold: true };
+    if (String(cmp.getRow(r).getCell(7).value).includes("ย้ายวัน")) {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GOLD } };
+    }
+  }
+  console.log(`  เทียบก่อน-หลัง: ${changed} แมตช์ที่เปลี่ยน`);
+}
+
+// ห่อด้วยฟังก์ชันแทน top-level await เพราะ tsx แปลงเป็น CommonJS แล้วรันโมดูล async ไม่ได้
+async function write() {
+  await wb.xlsx.writeFile(outPath);
+  console.log(`
+สร้างไฟล์แล้ว: ${outPath}`);
+  console.log(
+    `  ${M.length} แมตช์ · ${days.length} วัน · ${courts.length} คอร์ต · ${seed.ties.length} คู่สี
+`,
+  );
+}
+
+write();

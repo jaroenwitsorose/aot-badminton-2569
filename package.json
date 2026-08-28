@@ -20,7 +20,8 @@
     "verify:path": "tsx scripts/verify-path.ts",
     "verify:excel": "tsx scripts/verify-excel.ts",
     "verify:schedule": "tsx scripts/verify-schedule.ts",
-    "reschedule": "tsx scripts/reschedule.ts"
+    "reschedule": "tsx scripts/reschedule.ts",
+    "export:schedule": "tsx scripts/export-schedule-xlsx.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

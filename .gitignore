@@ -13,3 +13,6 @@ New folder/
 # Vercel CLI
 .vercel
 .env.production.local
+
+# ไฟล์ Excel ที่สคริปต์สร้าง (สร้างใหม่ได้เสมอด้วย npm run export:schedule)
+*.xlsx
