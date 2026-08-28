@@ -189,6 +189,9 @@ async function main(): Promise<void> {
   // match_no เป็นคอลัมน์ unique และเลขแมตช์เรียงใหม่ได้เมื่อจัดตารางใหม่
   // ถ้า upsert ตรง ๆ จะชนกันกลางคัน (แมตช์ A ขอเลข 5 ที่แมตช์ B ยังถืออยู่)
   // จึงพลิกเลขเดิมเป็นค่าลบก่อน เพื่อเปิดทางให้เลขใหม่ทั้งชุดลงได้
+  //
+  // ถ้าสคริปต์ตายกลางคัน จะเหลือแมตช์ที่ยังเป็นเลขลบ — รันซ้ำได้เลย
+  // เพราะรอบถัดไปจะพลิกเฉพาะเลขบวก แล้ว upsert เขียนเลขที่ถูกต้องทับให้ทั้ง 158 รายการ
   const existingMatches = await prisma.match.count();
   if (existingMatches > 0) {
     await prisma.$executeRaw`UPDATE "match" SET match_no = -match_no WHERE match_no > 0`;
