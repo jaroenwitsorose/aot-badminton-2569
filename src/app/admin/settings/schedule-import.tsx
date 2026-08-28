@@ -84,6 +84,33 @@ export function ScheduleImport() {
 
       {preview ? (
         <div className="mt-3 flex flex-col gap-3">
+          {/* รหัสตาราง — ใช้เทียบกับไฟล์ Excel ที่ถืออยู่ว่าเป็นตารางชุดเดียวกันไหม */}
+          <div
+            className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg p-2.5 text-[12px]"
+            style={{ background: "var(--blue-soft)" }}
+          >
+            <span>
+              ตารางที่เว็บใช้อยู่ตอนนี้:{" "}
+              <b className="tabular" style={{ fontSize: 13 }}>
+                {preview.dbFingerprint}
+              </b>
+            </span>
+            <span>
+              ตารางในไฟล์ตั้งต้น:{" "}
+              <b className="tabular" style={{ fontSize: 13 }}>
+                {preview.fileFingerprint}
+              </b>
+            </span>
+            <span style={{ color: "var(--muted)" }}>
+              {preview.dbFingerprint === preview.fileFingerprint
+                ? "· รหัสตรงกัน"
+                : "· รหัสไม่ตรงกัน จึงมีรายการให้นำเข้า"}
+            </span>
+            <span style={{ color: "var(--muted)", flexBasis: "100%" }}>
+              เทียบรหัสนี้กับช่อง <b>รหัสตาราง</b> ในชีต &quot;สรุป&quot; ของไฟล์ Excel
+              จะรู้ทันทีว่าไฟล์ที่ถืออยู่ตรงกับเว็บหรือไม่
+            </span>
+          </div>
           {preview.blockers.length > 0 ? (
             <div className="notice error" style={{ margin: 0 }}>
               <b>นำเข้าไม่ได้</b>

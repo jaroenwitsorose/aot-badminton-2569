@@ -15,6 +15,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import seedJson from "../../data/seed-data.json";
+import { scheduleFingerprint } from "./schedule-fingerprint";
 
 interface FileMatch {
   matchNo: number;
@@ -60,6 +61,10 @@ export interface MatchMove {
 }
 
 export interface SchedulePreview {
+  /** รหัสตารางของไฟล์ตั้งต้นที่มากับเว็บเวอร์ชันนี้ */
+  fileFingerprint: string;
+  /** รหัสตารางที่เว็บใช้อยู่จริงตอนนี้ */
+  dbFingerprint: string;
   /** ตารางในไฟล์ตรงกับในฐานข้อมูลอยู่แล้ว ไม่มีอะไรต้องทำ */
   upToDate: boolean;
   totalMatches: number;
@@ -159,6 +164,8 @@ export async function previewScheduleImport(): Promise<SchedulePreview> {
     .map((x) => ({ result: x.r.result, fromPoints: x.db!.points, toPoints: x.r.points }));
 
   return {
+    fileFingerprint: scheduleFingerprint(fileMatches),
+    dbFingerprint: scheduleFingerprint(dbMatches),
     upToDate:
       moves.length === 0 && tiesChanged === 0 && rulesAdded.length === 0 && rulesChanged.length === 0,
     totalMatches: fileMatches.length,

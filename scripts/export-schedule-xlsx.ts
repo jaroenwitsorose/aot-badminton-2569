@@ -15,6 +15,7 @@
 
 import ExcelJS from "exceljs";
 import { validateXlsx } from "./validate-xlsx";
+import { scheduleFingerprint } from "../src/lib/schedule-fingerprint";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -206,6 +207,7 @@ for (const [k, v] of [
   ["จำนวนวันแข่ง", `${days.length} วัน`],
   ["คอร์ตที่ใช้", `${[...new Set(M.map((m) => m.courtNo))].sort((a, b) => a - b).join(", ")}`],
   ["คู่แข่งขัน", `${seed.pairs.length} คู่ · นักกีฬา ${seed.participants.length} คน`],
+  ["รหัสตาราง", scheduleFingerprint(M)],
   ["สถานที่", seed.tournament.venue ?? "ยังไม่กำหนด"],
   ["วันที่จริง", "ยังไม่กำหนด — ใช้ วันที่ 1/2/3 ไปก่อน"],
 ] as [string, string][]) {
@@ -251,6 +253,7 @@ for (const t of [
   "มือทั่วไป รอบ Page Playoff: ลง 3 คอร์ตพร้อมกันตามเดิม",
   "ทุกแมตช์ที่ต่อเนื่องกันมีเวลาพักอย่างน้อย 30 นาที",
   "ช่องคู่แข่งขันที่ยังเป็น \"ผู้ชนะนัดที่ ...\" จะเติมชื่อจริงให้เองเมื่อผลออก",
+  "รหัสตารางด้านบนใช้เทียบกับหน้าผู้ดูแลได้ ถ้ารหัสตรงกัน = ไฟล์นี้คือตารางเดียวกับที่เว็บใช้อยู่",
 ]) {
   const r = sum.addRow([`· ${t}`]);
   sum.mergeCells(`A${r.number}:D${r.number}`);
@@ -557,6 +560,7 @@ async function write() {
   }
 
   console.log(`สร้างไฟล์แล้ว: ${outPath}`);
+  console.log(`  รหัสตาราง: ${scheduleFingerprint(M)}`);
   console.log(
     `  ${M.length} แมตช์ · ${days.length} วัน · ${courts.length} คอร์ต · ${seed.ties.length} คู่สี · ตรวจไฟล์ผ่าน`,
   );
