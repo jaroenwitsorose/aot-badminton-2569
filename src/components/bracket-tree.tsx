@@ -20,6 +20,25 @@ interface BracketRound {
   matches: MatchView[];
 }
 
+/**
+ * สถานะของรอบหนึ่ง ๆ — ใช้ตอบคำถามว่า "ตอนนี้แข่งถึงรอบไหนแล้ว"
+ * ซึ่งเดิมต้องไล่อ่านการ์ดทีละใบในผังที่กว้างกว่าจอ จึงดูยากมากบนมือถือ
+ */
+type RoundState = "done" | "playing" | "waiting";
+
+function roundState(matches: MatchView[]): { state: RoundState; done: number; total: number } {
+  const total = matches.length;
+  const done = matches.filter((m) => m.decided).length;
+  const started = matches.some((m) => m.status !== "WAITING");
+  return { state: done === total && total > 0 ? "done" : started ? "playing" : "waiting", done, total };
+}
+
+const STATE_TH: Record<RoundState, string> = {
+  done: "จบแล้ว",
+  playing: "กำลังแข่ง",
+  waiting: "ยังไม่เริ่ม",
+};
+
 interface ConnectorLine {
   key: string;
   d: string;
@@ -31,6 +50,10 @@ export function BracketTree({ rounds, thirdPlace }: { rounds: BracketRound[]; th
   const containerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<string, HTMLAnchorElement>());
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
+  // การ์ดในรายการมือถือใช้ ref คนละชุดกับผัง มิฉะนั้นการ์ดใบหลังจะเขียนทับ ref
+  // แล้วเส้นเชื่อมในผังจะไปวัดตำแหน่งจากการ์ดในรายการแทน ทำให้เส้นเพี้ยนทั้งหมด
+  const listRefs = useRef(new Map<string, HTMLAnchorElement>());
+  const listRowRefs = useRef(new Map<string, HTMLDivElement>());
   const [lines, setLines] = useState<ConnectorLine[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
@@ -133,7 +156,55 @@ export function BracketTree({ rounds, thirdPlace }: { rounds: BracketRound[]; th
     };
   }, [allMatches, matchByCode]);
 
+  const steps = useMemo(() => {
+    const list = rounds.map((r) => ({ title: r.title, ...roundState(r.matches) }));
+    if (thirdPlace) list.push({ title: "ชิงอันดับ 3", ...roundState([thirdPlace]) });
+    return list;
+  }, [rounds, thirdPlace]);
+  const currentIndex = steps.findIndex((x) => x.state !== "done");
+
   return (
+    <div className="bracket-block">
+      {/* แถบบอกว่าแข่งถึงรอบไหนแล้ว — อ่านได้ทันทีโดยไม่ต้องเลื่อนดูผัง */}
+      <ol className="bracket-steps">
+        {steps.map((st, i) => (
+          <li
+            key={st.title}
+            className={`bracket-step ${st.state}${i === currentIndex ? " current" : ""}`}
+          >
+            <span className="bracket-step-dot" aria-hidden />
+            <span className="bracket-step-body">
+              <b>{st.title}</b>
+              <small>
+                {st.state === "done" ? `จบแล้ว ${st.total} แมตช์` : `${st.done}/${st.total} · ${STATE_TH[st.state]}`}
+              </small>
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      {/* มือถือ: ไล่ดูทีละรอบจากบนลงล่าง ไม่ต้องเลื่อนซ้ายขวา */}
+      <div className="bracket-round-list">
+        {[...rounds, ...(thirdPlace ? [{ title: "ชิงอันดับ 3", matches: [thirdPlace] }] : [])].map((round) => {
+          const st = roundState(round.matches);
+          return (
+            <section className={`bracket-round-group ${st.state}`} key={round.title}>
+              <header>
+                <b>{round.title}</b>
+                <span className={`bracket-round-state ${st.state}`}>
+                  {st.state === "done" ? `จบแล้ว ${st.total} แมตช์` : `${st.done}/${st.total} · ${STATE_TH[st.state]}`}
+                </span>
+              </header>
+              <div className="bracket-round-cards">
+                {round.matches.map((m) => (
+                  <BracketTreeCard key={m.matchUid} match={m} cardRefs={listRefs} rowRefs={listRowRefs} />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
     <div className="bracket-tree-scroll" ref={containerRef}>
       <svg className="bracket-tree-svg" width={size.w} height={size.h} aria-hidden>
         {lines.map((l) => (
@@ -172,6 +243,7 @@ export function BracketTree({ rounds, thirdPlace }: { rounds: BracketRound[]; th
           </div>
         ) : null}
       </div>
+    </div>
     </div>
   );
 }

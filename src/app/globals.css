@@ -295,6 +295,8 @@ button { cursor: pointer; }
 /* ───────────────────────── การ์ดแมตช์ ───────────────────────── */
 
 .match-card { display: grid; grid-template-columns: 128px minmax(0, 1fr); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; background: #fff; }
+/* การ์ดที่ไม่แสดงคอลัมน์เวลา (เช่น "แมตช์ถัดไป" หน้าแรก) ต้องใช้คอลัมน์เดียว */
+.match-card.no-when { grid-template-columns: minmax(0, 1fr); }
 .match-when { background: #eef4fb; padding: 20px 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
 .match-when strong { font-size: 26px; }
 .match-when span { font-size: 11px; color: var(--muted); }
@@ -350,6 +352,48 @@ button { cursor: pointer; }
 .bracket-tree-row span { overflow-wrap: anywhere; }
 .bracket-tree-row.win { font-weight: 800; background: #fff6d9; }
 .bracket-tree-row b { flex: none; }
+
+
+/* ── สายการแข่งขัน: แถบบอกรอบ + รายการรายรอบสำหรับมือถือ ─────────────────
+ * เดิมมีแต่ผังแบบเชื่อมเส้นซึ่งกว้างกว่าจอมือถือมาก ผู้ใช้ต้องเลื่อนซ้ายขวา
+ * แล้วหัวข้อรอบก็เลื่อนหายไปด้วย จึงดูไม่ออกว่าตอนนี้แข่งถึงรอบไหน
+ * แก้สองชั้น: แถบสรุปรอบไว้บนสุด (เห็นทุกขนาดจอ) และรายการรายรอบแทนผังบนมือถือ
+ */
+.bracket-block { display: grid; gap: 16px; min-width: 0; }
+
+.bracket-steps {
+  list-style: none; margin: 0; padding: 0 2px 4px;
+  display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.bracket-step {
+  display: flex; align-items: center; gap: 9px; flex: none;
+  padding: 9px 14px 9px 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: #fff;
+}
+.bracket-step-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); flex: none; }
+.bracket-step-body { display: flex; flex-direction: column; line-height: 1.25; }
+.bracket-step-body b { font-size: 13px; color: var(--ink); white-space: nowrap; }
+.bracket-step-body small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.bracket-step.done { background: #e9f7ee; border-color: #bfe4cc; }
+.bracket-step.done .bracket-step-dot { background: #16a34a; }
+.bracket-step.done .bracket-step-body b { color: #14663a; }
+.bracket-step.playing { background: #fff5da; border-color: #ecd477; }
+.bracket-step.playing .bracket-step-dot { background: #d97706; }
+.bracket-step.current { box-shadow: 0 0 0 2px var(--blue-soft); border-color: var(--blue); }
+.bracket-step.current .bracket-step-body b { color: var(--blue); font-weight: 800; }
+
+.bracket-round-list { display: none; }
+.bracket-round-group { border: 1px solid var(--line); border-radius: 16px; background: #fff; overflow: hidden; }
+.bracket-round-group > header {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 14px; background: #f7f9fc; border-bottom: 1px solid var(--line);
+}
+.bracket-round-group > header b { font-size: 14px; }
+.bracket-round-state { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #eef2f7; color: var(--muted); white-space: nowrap; }
+.bracket-round-state.done { background: #e9f7ee; color: #14663a; }
+.bracket-round-state.playing { background: #fff5da; color: #8a6a00; }
+.bracket-round-cards { display: grid; gap: 10px; padding: 12px; }
+.bracket-round-cards .bracket-tree-card { box-shadow: none; }
 
 /*
  * ตัวห่อ section ของหน้าสายการแข่งขัน — ใช้ display:grid เรียง section แนวตั้ง
@@ -483,6 +527,7 @@ footer.site-footer a { color: #cfe0f4; }
   .panel { padding: 16px; border-radius: 18px; }
   .filter-bar, .filter-bar.four { grid-template-columns: 1fr 1fr; }
   .match-card { grid-template-columns: 84px minmax(0, 1fr); border-radius: 16px; }
+  .match-card.no-when { grid-template-columns: minmax(0, 1fr); }
   .match-when { padding: 12px 6px; }
   .match-when strong { font-size: 20px; }
   .match-body { padding: 13px 12px; }
@@ -493,6 +538,11 @@ footer.site-footer a { color: #cfe0f4; }
   .inline-heading { align-items: flex-start; gap: 10px; flex-direction: column; }
   .detail-card { padding: 16px; }
   .team-tie { padding: 12px; }
+  /* มือถือดูผังแบบเชื่อมเส้นไม่ไหว ใช้รายการรายรอบแทน จะได้ไม่ต้องเลื่อนซ้ายขวา */
+  .bracket-tree-scroll { display: none; }
+  .bracket-round-list { display: grid; gap: 14px; }
+  .bracket-steps { gap: 6px; }
+  .bracket-step { padding: 8px 12px 8px 10px; }
   .bracket-tree-columns { gap: 28px; }
   .bracket-tree-col { width: 200px; }
   .bracket-tree-card { padding: 8px; }

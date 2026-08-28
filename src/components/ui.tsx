@@ -92,7 +92,9 @@ export function MatchCard({
   showLink?: boolean;
 }) {
   return (
-    <article className="match-card">
+    // ไม่มีคอลัมน์เวลา = การ์ดต้องเป็นคอลัมน์เดียว ไม่งั้นเนื้อหาจะไปตกในช่อง 84px
+    // ที่กันไว้ให้เวลา แล้วชื่อคู่จะถูกหักบรรทัดจนกลายเป็นแถบตั้งบนมือถือ
+    <article className={`match-card${showWhen ? "" : " no-when"}`}>
       {showWhen ? (
         <div className="match-when">
           <span>{match.dayLabel.replace(/ ·.*/, "")}</span>

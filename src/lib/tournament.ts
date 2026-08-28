@@ -311,6 +311,20 @@ export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
       gender: pt.gender,
     }));
     const isPlaceholder = players.some((pl) => !pl.hasRealName);
+
+    /**
+     * ป้ายชื่อคู่ที่เอาไปแสดงทั่วเว็บ
+     *
+     * ตอนยังไม่กรอกชื่อจริง เดิมใช้ displayCode ต่อกันสองอัน เช่น
+     * "แดง_LEVEL1_MD_2-1 / แดง_LEVEL1_MD_2-2" ซึ่งเป็นข้อความยาวที่ไม่มีที่ให้ตัดบรรทัด
+     * พอไปอยู่ในการ์ดแคบ ๆ บนมือถือจึงถูกหักทีละตัวอักษรจนกลายเป็นแถบตั้ง อ่านไม่ได้เลย
+     * เปลี่ยนมาใช้คำอธิบายสั้น ๆ ที่คนอ่านรู้เรื่องแทน และตัดบรรทัดได้ตามช่องว่าง
+     */
+    const eventOrLevel = p.eventType ? EVENT_TH[p.eventType as EventType] : level.nameTh;
+    const label = players.some((pl) => pl.hasRealName)
+      ? players.map((pl) => (pl.hasRealName ? pl.name : "รอกรอกชื่อ")).join(" / ")
+      : `${team.nameTh} · ${eventOrLevel} คู่ที่ ${p.slotNo}`;
+
     pairViews.set(p.pairUid, {
       pairUid: p.pairUid,
       publicPairCode: p.publicPairCode,
@@ -324,7 +338,7 @@ export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
       slotNo: p.slotNo,
       withdrawn: p.withdrawn,
       players,
-      label: players.map((pl) => pl.name).join(" / "),
+      label,
       isPlaceholder,
     });
   }
