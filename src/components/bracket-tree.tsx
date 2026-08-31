@@ -204,7 +204,8 @@ export function BracketTree({ rounds, thirdPlace }: { rounds: BracketRound[]; th
           return (
             <div className={`bracket-tree-col${withThird ? " bracket-tree-col-final" : ""}`} key={round.title}>
               <h3>
-                {round.title} <span>({round.matches.length} แมตช์)</span>
+                {round.title}{" "}
+                <span>{withThird ? "(รวมชิงอันดับ 3)" : `(${round.matches.length} แมตช์)`}</span>
               </h3>
               <div className="bracket-tree-col-inner">
                 {round.matches.map((m) => (

@@ -359,6 +359,8 @@ input[type="checkbox"], input[type="radio"] { border: none; padding: 0; backgrou
 /* คอลัมน์สุดท้ายมีสองใบซ้อนกัน (ชิงชนะเลิศ แล้วต่อด้วยชิงอันดับ 3)
    ต้องรวมกลุ่มไว้กลางคอลัมน์ ไม่ใช่กระจายเต็มความสูงแบบรอบอื่น */
 .bracket-tree-col-final .bracket-tree-col-inner { justify-content: center; gap: 26px; }
+/* หัวคอลัมน์สุดท้ายยาวกว่าคอลัมน์อื่น ปล่อยให้ตัดบรรทัดได้ ไม่งั้นล้นไปทับคอลัมน์ถัดไป */
+.bracket-tree-col-final h3 { white-space: normal; }
 .bracket-tree-card { display: block; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 9px; box-shadow: var(--shadow-card); }
 /* หัวข้อบนกล่อง — บอกรอบและประเภท ไม่ให้หลงตอนเลื่อนดูผังที่กว้างกว่าจอ */
 .bracket-tree-head {
