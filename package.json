@@ -21,7 +21,8 @@
     "verify:excel": "tsx scripts/verify-excel.ts",
     "verify:schedule": "tsx scripts/verify-schedule.ts",
     "reschedule": "tsx scripts/reschedule.ts",
-    "export:schedule": "tsx scripts/export-schedule-xlsx.ts"
+    "export:schedule": "tsx scripts/export-schedule-xlsx.ts",
+    "apply:court-grid": "tsx scripts/apply-court-grid.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

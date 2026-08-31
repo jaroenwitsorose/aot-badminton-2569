@@ -132,19 +132,13 @@ for (const tie of seed.ties) {
   const ms = tie.matchNos.map((n) => byNo.get(n)!);
   const uniqueSlots = new Set(ms.map(slotKey));
   const sameDay = new Set(ms.map((m) => m.dayNo)).size === 1;
-  if (tie.phase === "ROUND_ROBIN") {
-    check(
-      `${tie.tieId} รอบพบกันหมด: 3 แมตช์อยู่คนละช่วงเวลา ในวันเดียวกัน`,
-      uniqueSlots.size === 3 && sameDay,
-      `${uniqueSlots.size} ช่วง · ${[...uniqueSlots].join(" ")}`,
-    );
-  } else {
-    check(
-      `${tie.tieId} Page Playoff: 3 แมตช์พร้อมกัน 3 คอร์ต (คงรูปแบบเดิม)`,
-      uniqueSlots.size === 1 && new Set(ms.map((m) => m.courtNo)).size === 3,
-      [...uniqueSlots].join(" "),
-    );
-  }
+  // ทุกรอบของมือทั่วไปลงทีละคู่ รวม Page Playoff ด้วย — เหตุผลเดียวกับรอบพบกันหมด
+  // คือสีหนึ่งมีแค่ 3 คู่ = 6 คน จะลงพร้อมกัน 3 คอร์ตไม่ได้ถ้าคนซ้ำกัน
+  check(
+    `${tie.tieId} ${tie.phase === "ROUND_ROBIN" ? "รอบพบกันหมด" : "Page Playoff"}: 3 แมตช์คนละช่วงเวลา ในวันเดียวกัน`,
+    uniqueSlots.size === 3 && sameDay,
+    `${uniqueSlots.size} ช่วง · ${[...uniqueSlots].join(" ")}`,
+  );
 }
 
 // ───────── ลำดับตามสาย + เวลาพัก ─────────
@@ -178,7 +172,11 @@ for (const m of M) {
     const prev = byNo.get(p)!;
     const gap = idx(m) - idx(prev);
     if (gap <= 0) orderViolations.push(`#${m.matchNo} ต้องอยู่หลัง #${p}`);
-    else if (gap < 2) restViolations.push(`#${p} → #${m.matchNo} ห่างแค่ ${gap} ช่วง`);
+    // ข้ามคนละวัน = พักข้ามคืน ไม่ต้องนับช่วง (idx เรียงต่อกันข้ามวัน ช่วงสุดท้ายของวันก่อน
+    // กับช่วงแรกของวันถัดไปจึงห่างกันแค่ 1 ทั้งที่จริงห่างกันเป็นสิบชั่วโมง)
+    else if (prev.dayNo === m.dayNo && gap < 2) {
+      restViolations.push(`#${p} → #${m.matchNo} ห่างแค่ ${gap} ช่วง`);
+    }
   }
 }
 check("ทุกแมตช์อยู่หลังแมตช์ที่ผลต่อกัน", orderViolations.length === 0, orderViolations.slice(0, 3).join(" · "));

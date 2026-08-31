@@ -101,6 +101,11 @@ const LEVEL_TH: Record<string, string> = {
 };
 const EVENT_TH: Record<string, string> = { MD: "ชายคู่", WD: "หญิงคู่", XD: "คู่ผสม" };
 const TEAM_TH: Record<string, string> = { PUR: "ม่วง", GRN: "เขียว", RED: "แดง", BLU: "น้ำเงิน" };
+/**
+ * มือ C/D แบ่งเป็นสองสายที่แข่งคู่ขนานกัน บางช่วงลงพร้อมกันทั้งสี่คอร์ต
+ * ถ้าไม่บอกสาย คนอ่านจะแยกไม่ออกว่านัดไหนเป็นของสายไหน
+ */
+const BRACKET_TH: Record<string, string> = { UPPER: "สายบน", LOWER: "สายล่าง" };
 const L = (c: string) => LEVEL_TH[c] ?? c;
 
 /**
@@ -290,7 +295,7 @@ for (const m of M) {
     m.courtNo,
     L(m.levelCode),
     m.eventType ? EVENT_TH[m.eventType] : "—",
-    m.roundLabel,
+    BRACKET_TH[m.bracket] ? `${m.roundLabel} · ${BRACKET_TH[m.bracket]}` : m.roundLabel,
     sideLabel(m.sideASource),
     sideLabel(m.sideBSource),
     m.sourceMatchCode,
@@ -334,7 +339,7 @@ function cellText(m: Match): string {
 ${stage} · คู่ที่ ${m.tieOrderNo}`;
   }
   const ev = m.eventType ? ` · ${EVENT_TH[m.eventType]}` : "";
-  return `#${m.matchNo}  ${L(m.levelCode)}${ev}
+  return `#${m.matchNo}  ${L(m.levelCode)}${ev}${BRACKET_TH[m.bracket] ? ` ${BRACKET_TH[m.bracket]}` : ""}
 ${m.roundLabel}`;
 }
 
@@ -413,9 +418,22 @@ for (const d of days) {
     cell.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
   });
 
-  const times = [...new Set(inDay.map((m) => m.startTime))].sort();
+  // ไล่ทีละ 30 นาทีตั้งแต่ต้นวันถึงท้ายวัน ไม่ใช่เฉพาะช่วงที่มีแมตช์
+  // เพราะช่วงที่ว่างทั้งแถวคือเวลาพักกลางวัน ซึ่งคนอ่านกระดาษต้องเห็นด้วย
+  const nextSlot = (hhmm: string) => {
+    const [h, mi] = hhmm.split(":").map(Number);
+    const t = h * 60 + mi + 30;
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  };
+  const times: string[] = [];
+  for (let t = first; t < last; t = nextSlot(t)) times.push(t);
+
   for (const t of times) {
     const inSlot = inDay.filter((m) => m.startTime === t);
+    if (inSlot.length === 0) {
+      banner(`${t}-${nextSlot(t)}   พักกลางวัน`, "FFF2F2F2", "FF6B7280", 11, 22);
+      continue;
+    }
     const row = grid.addRow([
       `${t}-${inSlot[0].endTime}`,
       ...courts.map((c) => {
