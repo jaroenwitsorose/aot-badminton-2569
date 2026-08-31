@@ -12,7 +12,6 @@ interface PlayerRow {
   playerNo: number;
   displayCode: string | null;
   actualName: string;
-  employeeId: string;
   skillRank: string;
   gender: string;
 }
@@ -129,7 +128,6 @@ function PairCard({
       const res = await saveParticipantAction({
         participantUid: row.participantUid,
         actualName: row.actualName,
-        employeeId: row.employeeId,
         skillRank: row.skillRank as SkillRank | "",
         gender: row.gender as Gender | "",
       });
@@ -203,17 +201,6 @@ function PairCard({
                   disabled={pending}
                   onChange={(e) =>
                     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, actualName: e.target.value } : r)))
-                  }
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-[12px]">
-                รหัสพนักงาน
-                <input
-                  type="text"
-                  value={row.employeeId}
-                  disabled={pending}
-                  onChange={(e) =>
-                    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, employeeId: e.target.value } : r)))
                   }
                 />
               </label>

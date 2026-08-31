@@ -22,7 +22,7 @@ export default async function ParticipantsPage() {
       <div>
         <h2 className="m-0 text-base font-semibold">รายชื่อนักกีฬา</h2>
         <p className="m-0 text-[13px]" style={{ color: "var(--muted)" }}>
-          กรอกชื่อจริง รหัสพนักงาน ระดับมือ และเพศ · ระบบจะเตือนถ้ารหัสพนักงานซ้ำหรือระดับมือไม่ตรงเกณฑ์
+          กรอกชื่อจริง ระดับมือ และเพศ · ระบบจะเตือนถ้าชื่อซ้ำในประเภทเดียวกันหรือระดับมือไม่ตรงเกณฑ์
         </p>
       </div>
 
@@ -44,7 +44,6 @@ export default async function ParticipantsPage() {
             playerNo: x.playerNo,
             displayCode: x.displayCode,
             actualName: x.actualName ?? "",
-            employeeId: x.employeeId ?? "",
             skillRank: x.skillRank ?? "",
             gender: x.gender ?? "",
           })),

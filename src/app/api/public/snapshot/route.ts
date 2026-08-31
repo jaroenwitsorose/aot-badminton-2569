@@ -20,12 +20,9 @@ export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
-    const snapshot = await getCachedTournamentSnapshot();
-
-    const publicSnapshot = {
-      ...snapshot,
-      pairs: snapshot.pairs.map(stripPair),
-    };
+    // ไม่ต้องกรองอะไรออกแล้ว — เดิมต้องตัดรหัสพนักงานทิ้งก่อนส่งออกหน้าสาธารณะ
+    // แต่ระบบเลิกเก็บรหัสพนักงานไปแล้ว snapshot จึงไม่มีข้อมูลส่วนบุคคลตั้งแต่ต้นทาง
+    const publicSnapshot = await getCachedTournamentSnapshot();
 
     // generatedAt เปลี่ยนทุกครั้งที่โหลดใหม่ ถ้าเอามาคิดด้วยป้ายกำกับจะไม่มีวันตรงกัน
     // จึงคิดจาก "เนื้อข้อมูลจริง" เท่านั้น
@@ -47,9 +44,4 @@ export async function GET(request: Request) {
     const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
-
-/** รหัสพนักงานเป็นข้อมูลภายใน ไม่ส่งออกหน้าสาธารณะ */
-function stripPair<T extends { players: { employeeId: string | null }[] }>(pair: T): T {
-  return { ...pair, players: pair.players.map((p) => ({ ...p, employeeId: null })) };
 }

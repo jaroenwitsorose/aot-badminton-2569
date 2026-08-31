@@ -26,6 +26,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { writeAudit, type AuditAction } from "@/lib/audit";
+import { normalizePersonName } from "@/lib/excel/shared";
 import { simulateAllResults } from "@/lib/simulator";
 import {
   applyScheduleImport,
@@ -351,7 +352,6 @@ export async function resetMatchAction(input: { matchUid: string; reason: string
 export async function saveParticipantAction(input: {
   participantUid: string;
   actualName: string;
-  employeeId: string;
   skillRank: SkillRank | "";
   gender: Gender | "";
 }): Promise<ActionResult> {
@@ -364,15 +364,31 @@ export async function saveParticipantAction(input: {
     if (!participant) return fail("ไม่พบนักกีฬาคนนี้");
 
     const name = input.actualName.trim();
-    const employeeId = input.employeeId.trim();
     const skillRank = input.skillRank || null;
 
-    if (employeeId) {
-      const duplicate = await prisma.participant.findFirst({
-        where: { employeeId, participantUid: { not: input.participantUid } },
+    /*
+     * 1 คนลงได้คู่เดียวต่อ "ระดับมือ + ประเภท" (ลงข้ามประเภทได้)
+     *
+     * เดิมกันคนซ้ำด้วยรหัสพนักงาน แต่เลิกเก็บช่องนั้นแล้ว จึงเทียบด้วยชื่อที่ตัดคำนำหน้า
+     * และช่องว่างออก — เคยเจอของจริงที่คนหนึ่งถูกใส่ไว้สองคู่ในคู่ผสมระดับเดียวกัน
+     * จนต้องลงแข่งกับตัวเองในรอบแบ่งกลุ่ม
+     */
+    if (name) {
+      const others = await prisma.participant.findMany({
+        where: {
+          participantUid: { not: input.participantUid },
+          levelCode: participant.levelCode,
+          eventType: participant.eventType,
+          actualName: { not: null },
+        },
+        select: { participantUid: true, actualName: true },
       });
-      if (duplicate) {
-        return fail(`รหัสพนักงาน ${employeeId} ถูกใช้แล้วใน ${duplicate.participantUid} — นักกีฬาห้ามซ้ำ`);
+      const key = normalizePersonName(name);
+      const clash = others.find((p) => normalizePersonName(p.actualName!) === key);
+      if (clash) {
+        return fail(
+          `"${name}" ถูกใส่ไว้อีกคู่หนึ่งในระดับและประเภทเดียวกันแล้ว (${clash.participantUid}) — 1 คนลงได้คู่เดียวต่อประเภท`,
+        );
       }
     }
 
@@ -384,10 +400,9 @@ export async function saveParticipantAction(input: {
         where: { participantUid: input.participantUid },
         data: {
           actualName: name || null,
-          employeeId: employeeId || null,
           skillRank: skillRank as SkillRank | null,
           gender: (input.gender || null) as Gender | null,
-          eligibilityChecked: Boolean(name && employeeId && skillRank && input.gender),
+          eligibilityChecked: Boolean(name && skillRank && input.gender),
         },
       });
       await writeAudit(
@@ -398,11 +413,10 @@ export async function saveParticipantAction(input: {
           entityId: input.participantUid,
           before: {
             actualName: participant.actualName,
-            employeeId: participant.employeeId,
             skillRank: participant.skillRank,
             gender: participant.gender,
           },
-          after: { actualName: name, employeeId, skillRank, gender: input.gender },
+          after: { actualName: name, skillRank, gender: input.gender },
           ...(await meta()),
         },
         tx,

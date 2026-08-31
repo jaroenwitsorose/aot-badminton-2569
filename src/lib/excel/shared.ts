@@ -28,7 +28,6 @@ export const PARTICIPANT_COLUMNS = [
   { key: "slotNo", header: "คู่ที่", width: 7, editable: false },
   { key: "playerNo", header: "คนที่", width: 7, editable: false },
   { key: "actualName", header: "ชื่อ-นามสกุล", width: 30, editable: true },
-  { key: "employeeId", header: "รหัสพนักงาน", width: 16, editable: true },
   { key: "skillRank", header: "ระดับมือจริง", width: 14, editable: true },
   { key: "gender", header: "เพศ", width: 9, editable: true },
 ] as const;
@@ -60,6 +59,27 @@ export const LINEUP_COLUMNS = [
   { key: "currentPair", header: "คู่ปัจจุบัน", width: 30, editable: false },
   { key: "pairChoice", header: "คู่ที่ส่งลงในลำดับนี้", width: 46, editable: true },
 ] as const;
+
+/**
+ * ตัดคำนำหน้าและช่องว่างส่วนเกินออก เพื่อเทียบว่าเป็น "คนเดียวกัน" หรือไม่
+ *
+ * เดิมใช้รหัสพนักงานเป็นตัวชี้ตัวคน แต่เอาช่องนั้นออกไปแล้ว จึงเหลือชื่อเป็นตัวเทียบ
+ * ซึ่งคนกรอกเขียนคำนำหน้าไม่เหมือนกัน — ในข้อมูลจริงมีทั้ง "นางสาวอัจฉรา" และ "น.ส.สายไหม"
+ * ถ้าเทียบดิบ ๆ คนเดียวกันที่พิมพ์คนละแบบจะกลายเป็นคนละคน แล้วตรวจลงซ้ำไม่เจอ
+ */
+const NAME_PREFIXES = ["นางสาว", "น.ส.", "นส.", "นาย", "นาง", "ด.ช.", "ด.ญ.", "ดร.", "Mr.", "Mrs.", "Ms."];
+
+export function normalizePersonName(name: string): string {
+  let t = name.replace(/\s+/g, " ").trim();
+  for (const p of NAME_PREFIXES) {
+    if (t.startsWith(p)) {
+      t = t.slice(p.length).trim();
+      break;
+    }
+  }
+  // ตัดช่องว่างออกทั้งหมด กันกรณีเว้นวรรคระหว่างชื่อกับนามสกุลไม่เท่ากัน
+  return t.replace(/\s/g, "").toLowerCase();
+}
 
 // ───────────────────────── การแปลงค่า ─────────────────────────
 

@@ -64,7 +64,6 @@ export interface SeedParticipant {
   playerNo: number;
   displayCode: string | null;
   actualName: string | null;
-  employeeId: string | null;
   teamCode: TeamCode;
   levelCode: LevelCode;
   eventType: EventType | null;

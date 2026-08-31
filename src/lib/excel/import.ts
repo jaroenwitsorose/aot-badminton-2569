@@ -31,6 +31,7 @@ import {
   SHEET,
   eventToDb,
   genderToDb,
+  normalizePersonName,
   pairUidFromChoice,
   skillRankToDb,
 } from "./shared";
@@ -125,7 +126,7 @@ export async function importDataEntryWorkbook(
   const startedTies = new Set(matches.filter((m) => m.tieId && m.status !== "WAITING").map((m) => m.tieId!));
 
   // ───────── สถานะหลังนำเข้า (ใช้ตรวจข้ามชีต) ─────────
-  type PersonPatch = { actualName?: string; employeeId?: string; skillRank?: SkillRank; gender?: Gender };
+  type PersonPatch = { actualName?: string; skillRank?: SkillRank; gender?: Gender };
   const personPatch = new Map<string, PersonPatch>();
   const eventPatch = new Map<string, EventType>();
   const drawPatch = new Map<string, string>(); // token -> pairUid
@@ -164,7 +165,6 @@ export async function importDataEntryWorkbook(
     const c = {
       uid: idxOf(PARTICIPANT_COLUMNS, "participantUid"),
       name: idxOf(PARTICIPANT_COLUMNS, "actualName"),
-      emp: idxOf(PARTICIPANT_COLUMNS, "employeeId"),
       skill: idxOf(PARTICIPANT_COLUMNS, "skillRank"),
       gender: idxOf(PARTICIPANT_COLUMNS, "gender"),
     };
@@ -191,15 +191,6 @@ export async function importDataEntryWorkbook(
       const name = cellText(row.getCell(c.name).value);
       if (name) patch.actualName = name;
 
-      const emp = cellText(row.getCell(c.emp).value);
-      if (emp) {
-        if (!/^[\w-]{1,32}$/.test(emp)) {
-          add(SHEET.participants, r, `รหัสพนักงาน "${emp}" มีอักขระที่ใช้ไม่ได้`);
-        } else {
-          patch.employeeId = emp;
-        }
-      }
-
       const skillRaw = cellText(row.getCell(c.skill).value);
       if (skillRaw) {
         const v = skillRankToDb(skillRaw);
@@ -221,17 +212,33 @@ export async function importDataEntryWorkbook(
       if (Object.keys(patch).length > 0) personPatch.set(uid, patch);
     }
 
-    // รหัสพนักงานห้ามซ้ำ — ตรวจกับสถานะหลังนำเข้าทั้งหมด ไม่ใช่แค่ในไฟล์
-    const empOwner = new Map<string, string>();
+    /*
+     * คนเดียวกันลงได้คู่เดียวต่อ "ระดับมือ + ประเภท" (ลงข้ามประเภทได้)
+     *
+     * เดิมใช้รหัสพนักงานเป็นตัวเทียบว่าเป็นคนเดียวกัน แต่ช่องนั้นถูกเอาออกแล้ว
+     * จึงเทียบด้วยชื่อที่ตัดคำนำหน้าและช่องว่างออก — เคยเจอของจริงที่คนหนึ่ง
+     * ถูกใส่ไว้สองคู่ในคู่ผสมของระดับเดียวกัน ทำให้ต้องลงแข่งกับตัวเอง
+     *
+     * ตรวจกับสถานะหลังนำเข้า ไม่ใช่แค่แถวที่อยู่ในไฟล์
+     */
+    const slotOwner = new Map<string, string>();
     for (const p of participants) {
-      const emp = personPatch.get(p.participantUid)?.employeeId ?? p.employeeId;
-      if (!emp) continue;
-      const prev = empOwner.get(emp);
-      if (prev) {
+      const name = personPatch.get(p.participantUid)?.actualName ?? p.actualName;
+      if (!name) continue;
+      const pair = pairById.get(p.pairUid);
+      if (!pair) continue;
+      const event = finalEvent(p.pairUid);
+      const key = `${normalizePersonName(name)}|${pair.levelCode}|${event ?? "ยังไม่ล็อกประเภท"}`;
+      const prev = slotOwner.get(key);
+      if (prev && prev !== p.participantUid) {
         const rowNo = seenRows.get(p.participantUid) ?? seenRows.get(prev) ?? null;
-        add(SHEET.participants, rowNo, `รหัสพนักงาน ${emp} ซ้ำกันระหว่าง ${prev} กับ ${p.participantUid}`);
-      } else {
-        empOwner.set(emp, p.participantUid);
+        add(
+          SHEET.participants,
+          rowNo,
+          `"${name}" ถูกใส่ไว้มากกว่า 1 คู่ในระดับและประเภทเดียวกัน (${prev} กับ ${p.participantUid}) — 1 คนลงได้คู่เดียวต่อประเภท`,
+        );
+      } else if (!prev) {
+        slotOwner.set(key, p.participantUid);
       }
     }
   }
@@ -514,13 +521,11 @@ export async function importDataEntryWorkbook(
         const before = personById.get(uid)!;
         const after = {
           actualName: patch.actualName ?? before.actualName,
-          employeeId: patch.employeeId ?? before.employeeId,
           skillRank: patch.skillRank ?? before.skillRank,
           gender: patch.gender ?? before.gender,
         };
         const same =
           after.actualName === before.actualName &&
-          after.employeeId === before.employeeId &&
           after.skillRank === before.skillRank &&
           after.gender === before.gender;
         if (same) continue;
@@ -529,14 +534,14 @@ export async function importDataEntryWorkbook(
           where: { participantUid: uid },
           data: {
             ...after,
-            eligibilityChecked: Boolean(after.actualName && after.employeeId && after.skillRank && after.gender),
+            eligibilityChecked: Boolean(after.actualName && after.skillRank && after.gender),
           },
         });
         audit(
           "PARTICIPANT_UPDATE",
           "participant",
           uid,
-          { actualName: before.actualName, employeeId: before.employeeId, skillRank: before.skillRank, gender: before.gender },
+          { actualName: before.actualName, skillRank: before.skillRank, gender: before.gender },
           { ...after, source: "EXCEL_IMPORT" },
         );
         appliedPeople += 1;

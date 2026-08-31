@@ -27,7 +27,6 @@ export interface PlayerView {
   playerNo: number;
   name: string;
   hasRealName: boolean;
-  employeeId: string | null;
   skillRank: string | null;
   gender: string | null;
 }
@@ -348,7 +347,6 @@ export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
       playerNo: pt.playerNo,
       name: pt.actualName ?? pt.displayCode ?? templates[idx] ?? `${team.nameTh} ${p.slotNo}-${pt.playerNo}`,
       hasRealName: Boolean(pt.actualName),
-      employeeId: pt.employeeId,
       skillRank: pt.skillRank,
       gender: pt.gender,
     }));
