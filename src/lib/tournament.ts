@@ -5,6 +5,7 @@
  * ข้อมูลทั้งชุดมีแค่ 158 แมตช์ / 92 คู่ จึงคำนวณสดทุกครั้งได้สบาย ไม่ต้องเก็บสถานะซ้ำซ้อน
  */
 
+import { unstable_cache } from "next/cache";
 import { prisma } from "./prisma";
 import { runEngine } from "./engine";
 import type {
@@ -213,11 +214,24 @@ const CATEGORY_LABEL: Record<string, string> = {
 const SNAPSHOT_TTL_MS = 3000;
 let cachedSnapshot: { at: number; promise: Promise<TournamentSnapshot> } | null = null;
 
+/**
+ * ชั้นที่สอง: แคชกลางของ Vercel ซึ่งใช้ร่วมกันทุกเครื่อง
+ *
+ * จำเป็นเพราะเวลามีคนเปิดพร้อมกันเยอะ ๆ Vercel จะกระจายไปหลายเครื่อง
+ * แต่ละเครื่องมีหน่วยความจำของตัวเอง แคชในเครื่อง (ชั้นแรก) จึงช่วยได้เฉพาะ
+ * คำขอที่ตกมาเครื่องเดียวกัน — ชั้นนี้ทำให้ทุกเครื่องใช้ผลอ่านชุดเดียวกัน
+ *
+ * snapshot เป็นข้อมูลธรรมดาล้วน (generatedAt เก็บเป็นสตริงอยู่แล้ว) จึงแปลงเก็บได้ปลอดภัย
+ */
+const loadSharedSnapshot = unstable_cache(() => getTournamentSnapshot(), ["tournament-snapshot"], {
+  revalidate: SNAPSHOT_TTL_MS / 1000,
+});
+
 export function getCachedTournamentSnapshot(ttlMs = SNAPSHOT_TTL_MS): Promise<TournamentSnapshot> {
   const now = Date.now();
   if (cachedSnapshot && now - cachedSnapshot.at < ttlMs) return cachedSnapshot.promise;
 
-  const promise = getTournamentSnapshot();
+  const promise = loadSharedSnapshot();
   cachedSnapshot = { at: now, promise };
   // อย่าเก็บผลที่โหลดพังไว้ให้คนถัดไปเจอซ้ำ — ล้างทิ้งเพื่อให้ลองใหม่ได้ทันที
   promise.catch(() => {
