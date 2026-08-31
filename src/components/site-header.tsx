@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useSnapshot } from "./snapshot-provider";
 
 const LINKS = [
@@ -19,6 +20,23 @@ export function SiteHeader() {
   const pathname = usePathname();
   const { snapshot } = useSnapshot();
   const isAdmin = pathname.startsWith("/admin");
+
+  /**
+   * แถบเมนูค้างบนสุดเวลาเลื่อนหน้า ส่วนหัวเว็บ (โลโก้ใหญ่ + ชื่องาน) เลื่อนหายไปตามปกติ
+   * พอหัวเว็บพ้นจอ จะสลับโลโก้เล็กขึ้นมาในแถบเมนูแทน เพื่อให้ยังรู้ว่าอยู่เว็บไหน
+   *
+   * ใช้ตัวดัก (sentinel) สูง 1px คั่นระหว่างหัวเว็บกับแถบเมนู แล้วดูว่ามันพ้นจอหรือยัง
+   * ดีกว่าฟัง scroll เพราะเบราว์เซอร์คำนวณให้เอง ไม่ต้องอ่านตำแหน่งทุกเฟรม
+   */
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([entry]) => setStuck(!entry.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [isAdmin]);
 
   return (
     <header className="site-header">
@@ -40,18 +58,27 @@ export function SiteHeader() {
       </div>
 
       {isAdmin ? null : (
-        <nav className="site-nav" aria-label="เมนูหลัก">
-          <div className="shell nav-scroll">
-            {LINKS.map((link) => {
-              const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
-              return (
-                <Link key={link.href} href={link.href} aria-current={active ? "page" : undefined}>
-                  {link.label}
-                </Link>
-              );
-            })}
+        <>
+        <div ref={sentinelRef} className="nav-sentinel" aria-hidden />
+        <nav className={`site-nav${stuck ? " stuck" : ""}`} aria-label="เมนูหลัก">
+          <div className="shell nav-row">
+            {/* โลโก้อยู่นอกแถบที่เลื่อนแนวนอน จะได้ไม่หายไปตอนผู้ใช้ปัดหาเมนูขวาสุด */}
+            <Link href="/" className="nav-logo" aria-label="กลับหน้าแรก" tabIndex={stuck ? 0 : -1}>
+              <Image src="/assets/aot-logo.png" alt="" width={526} height={198} />
+            </Link>
+            <div className="nav-scroll">
+              {LINKS.map((link) => {
+                const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+                return (
+                  <Link key={link.href} href={link.href} aria-current={active ? "page" : undefined}>
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </nav>
+        </>
       )}
     </header>
   );

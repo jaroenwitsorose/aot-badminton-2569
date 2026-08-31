@@ -112,7 +112,7 @@ export default function SchedulePage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="พิมพ์ชื่อนักกีฬา หรือเลขแมตช์ เพื่อดูว่าแข่งวันไหนและเส้นทางถัดไป"
-              style={{ marginTop: 6 }}
+              className="search-input"
             />
           </label>
 

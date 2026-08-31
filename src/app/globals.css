@@ -76,6 +76,10 @@ input, select, textarea {
   background: #fff;
 }
 input[type="checkbox"], input[type="radio"] { border: none; padding: 0; background: none; }
+/* ปิดหน้าตาช่องค้นหาประจำเบราว์เซอร์ ไม่งั้นมุมโค้งกับเงาไม่เหมือนช่องกรอกอื่นในเว็บ */
+input[type="search"] { -webkit-appearance: none; appearance: none; }
+/* ช่องค้นหานักกีฬา — ต้องเต็มความกว้าง ไม่งั้นข้อความบอกวิธีใช้โดนตัดกลางคัน */
+.search-input { width: 100%; margin-top: 6px; }
 
 :focus-visible {
   outline: 3px solid var(--blue);
@@ -96,10 +100,16 @@ input[type="checkbox"], input[type="radio"] { border: none; padding: 0; backgrou
 
 /* ───────────────────────── header ───────────────────────── */
 
+/*
+ * หัวเว็บ (โลโก้ใหญ่ + ชื่องาน) เลื่อนหายไปตามปกติ ค้างไว้เฉพาะแถบเมนูด้านล่าง
+ * เดิมค้างทั้งก้อนบนจอใหญ่ ซึ่งกินพื้นที่จอไปราว 125px ตลอดเวลา
+ * ส่วนบนมือถือกลับไม่ค้างอะไรเลย ต้องเลื่อนกลับขึ้นบนสุดทุกครั้งที่จะเปลี่ยนหน้า
+ */
 .site-header {
-  position: sticky; top: 0; z-index: 40;
+  position: relative; z-index: 40;
   background: #fff; border-bottom: 1px solid var(--line); box-shadow: var(--shadow-pop);
 }
+.nav-sentinel { height: 1px; margin-bottom: -1px; }
 .header-main { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 10px; }
 .brand { display: flex; align-items: center; min-width: 0; }
 .brand-logo { display: flex; width: 150px; flex: none; align-items: center; }
@@ -108,8 +118,21 @@ input[type="checkbox"], input[type="radio"] { border: none; padding: 0; backgrou
 .brand-copy strong { font-size: 14px; letter-spacing: 0.02em; }
 .brand-copy small { font-size: 11px; color: var(--muted); margin-top: 3px; }
 
-.site-nav { border-top: 1px solid #edf1f7; }
+.site-nav {
+  position: sticky; top: 0; z-index: 41;
+  border-top: 1px solid #edf1f7; background: #fff;
+}
+/* พอหัวเว็บเลื่อนพ้นจอ ใส่เส้นขอบกับเงาให้แถบเมนู จะได้แยกออกจากเนื้อหาที่ไหลอยู่ข้างใต้ */
+.site-nav.stuck { border-bottom: 1px solid var(--line); box-shadow: var(--shadow-pop); }
+.nav-row { display: flex; align-items: center; gap: 14px; }
+.nav-logo {
+  flex: none; width: 0; overflow: hidden; opacity: 0;
+  transition: width 0.18s ease, opacity 0.18s ease;
+}
+.site-nav.stuck .nav-logo { width: 84px; opacity: 1; }
+.nav-logo img { display: block; width: 84px; height: auto; }
 .nav-scroll {
+  flex: 1; min-width: 0;
   min-height: 47px; display: flex; justify-content: flex-end; gap: 30px; align-items: center;
   overflow-x: auto; scrollbar-width: none; white-space: nowrap;
 }
@@ -519,8 +542,10 @@ footer.site-footer a { color: #cfe0f4; }
 
 @media (max-width: 650px) {
   .shell { width: min(100% - 24px, 1240px); }
-  .site-header { position: relative; }
   .brand-logo { width: 112px; }
+  .nav-row { gap: 10px; }
+  .site-nav.stuck .nav-logo { width: 64px; }
+  .nav-logo img { width: 64px; }
   .brand-copy { margin-left: 8px; }
   .brand-copy strong { font-size: 11px; }
   .brand-copy small { display: none; }
