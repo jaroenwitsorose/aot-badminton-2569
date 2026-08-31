@@ -198,6 +198,34 @@ const CATEGORY_LABEL: Record<string, string> = {
   TEAM: "ทีมสี",
 };
 
+/**
+ * เก็บพัก snapshot ไว้ระยะสั้น ๆ ให้หน้าสาธารณะใช้ร่วมกัน
+ *
+ * ปัญหาที่แก้: หน้าสาธารณะดึงข้อมูลใหม่ทุก 3 วินาที และเดิมทุกครั้งจะยิงอ่านฐานข้อมูล
+ * 11 ตารางเต็ม ๆ ใหม่หมด ผู้ชม 100 คนจึงกลายเป็น 100 ครั้งต่อ 3 วินาที
+ * กินโควตาข้อมูลของ Neon (5 GB/เดือน) หมดภายในไม่กี่นาที
+ *
+ * เก็บ "สัญญา" (promise) ไม่ใช่ผลลัพธ์ เพราะคำขอที่เข้ามาพร้อมกันหลายรายการ
+ * จะได้เกาะสัญญาเดียวกัน = ยิงเข้าฐานข้อมูลครั้งเดียวจริง ๆ
+ *
+ * หน้าผู้ดูแลไม่ใช้ตัวนี้ — เรียก getTournamentSnapshot() ตรง ๆ เพื่อให้เห็นผลที่เพิ่งบันทึกทันที
+ */
+const SNAPSHOT_TTL_MS = 3000;
+let cachedSnapshot: { at: number; promise: Promise<TournamentSnapshot> } | null = null;
+
+export function getCachedTournamentSnapshot(ttlMs = SNAPSHOT_TTL_MS): Promise<TournamentSnapshot> {
+  const now = Date.now();
+  if (cachedSnapshot && now - cachedSnapshot.at < ttlMs) return cachedSnapshot.promise;
+
+  const promise = getTournamentSnapshot();
+  cachedSnapshot = { at: now, promise };
+  // อย่าเก็บผลที่โหลดพังไว้ให้คนถัดไปเจอซ้ำ — ล้างทิ้งเพื่อให้ลองใหม่ได้ทันที
+  promise.catch(() => {
+    if (cachedSnapshot?.promise === promise) cachedSnapshot = null;
+  });
+  return promise;
+}
+
 export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
   const [tournament, days, teams, levels, pairs, matches, ties, draws, lineups, rules, tiebreaks, checklist] =
     await Promise.all([

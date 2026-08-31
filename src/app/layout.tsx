@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { getTournamentSnapshot, type TournamentSnapshot } from "@/lib/tournament";
+import { getCachedTournamentSnapshot, type TournamentSnapshot } from "@/lib/tournament";
 import { SnapshotProvider } from "@/components/snapshot-provider";
 import { SiteHeader } from "@/components/site-header";
 import { SimulationNotice } from "@/components/simulation-notice";
@@ -42,7 +42,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let snapshot: TournamentSnapshot | null = null;
   let loadError: string | null = null;
   try {
-    snapshot = await getTournamentSnapshot();
+    // ทุกหน้าใช้ layout นี้ ถ้าอ่านสดทุกครั้งจะยิงฐานข้อมูลทุกการเปิดหน้า
+    // หัวเว็บใช้แค่ชื่องานกับสถานที่ ช้ากว่าความจริง 3 วินาทีไม่มีผล
+    snapshot = await getCachedTournamentSnapshot();
   } catch (error) {
     loadError = error instanceof Error ? error.message : "โหลดข้อมูลไม่สำเร็จ";
   }

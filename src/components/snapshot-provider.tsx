@@ -39,13 +39,28 @@ export function SnapshotProvider({
   const [lastSyncedAt, setLastSyncedAt] = useState(() => new Date());
   const [isStale, setIsStale] = useState(false);
   const inFlight = useRef(false);
+  /** ป้ายกำกับของข้อมูลชุดที่ถืออยู่ ส่งกลับไปให้เซิร์ฟเวอร์เทียบว่าเปลี่ยนหรือยัง */
+  const etag = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
     try {
-      const res = await fetch("/api/public/snapshot", { cache: "no-store" });
+      const res = await fetch("/api/public/snapshot", {
+        cache: "no-store",
+        headers: etag.current ? { "if-none-match": etag.current } : undefined,
+      });
+
+      // 304 = ผลยังไม่เปลี่ยนตั้งแต่ครั้งก่อน เซิร์ฟเวอร์ไม่ส่งข้อมูลกลับมาเลย
+      // ของที่ถืออยู่ยังใหม่อยู่ แค่บันทึกว่าเพิ่งเช็กไปเมื่อไร
+      if (res.status === 304) {
+        setLastSyncedAt(new Date());
+        setIsStale(false);
+        return;
+      }
       if (!res.ok) throw new Error(String(res.status));
+
+      etag.current = res.headers.get("etag");
       setSnapshot((await res.json()) as TournamentSnapshot);
       setLastSyncedAt(new Date());
       setIsStale(false);
