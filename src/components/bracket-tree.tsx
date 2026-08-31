@@ -195,21 +195,32 @@ export function BracketTree({ rounds, thirdPlace }: { rounds: BracketRound[]; th
       </svg>
 
       <div className="bracket-tree-columns">
-        {rounds.map((round) => (
-          <div className="bracket-tree-col" key={round.title}>
-            <h3>
-              {round.title} <span>({round.matches.length} แมตช์)</span>
-            </h3>
-            <div className="bracket-tree-col-inner">
-              {round.matches.map((m) => (
-                <BracketTreeCard key={m.matchUid} match={m} cardRefs={cardRefs} rowRefs={rowRefs} />
-              ))}
+        {rounds.map((round, i) => {
+          // ชิงอันดับ 3 อยู่คอลัมน์เดียวกับชิงชนะเลิศ โดยวางไว้ใต้ชิงชนะเลิศ
+          // เคยแยกเป็นคอลัมน์ของตัวเองแล้วดันไปชิดล่างขวา หัวข้อลอยต่ำกว่าคอลัมน์อื่น
+          // จนดูเหมือนผังพัง และอ่านไม่ออกว่ารอบไหนมาก่อนมาหลัง
+          const isLast = i === rounds.length - 1;
+          const withThird = isLast && thirdPlace;
+          return (
+            <div className={`bracket-tree-col${withThird ? " bracket-tree-col-final" : ""}`} key={round.title}>
+              <h3>
+                {round.title} <span>({round.matches.length} แมตช์)</span>
+              </h3>
+              <div className="bracket-tree-col-inner">
+                {round.matches.map((m) => (
+                  <BracketTreeCard key={m.matchUid} match={m} cardRefs={cardRefs} rowRefs={rowRefs} />
+                ))}
+                {withThird ? (
+                  <BracketTreeCard match={thirdPlace} cardRefs={cardRefs} rowRefs={rowRefs} />
+                ) : null}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
-        {thirdPlace ? (
-          <div className="bracket-tree-col bracket-tree-col-third">
+        {/* กันเหนียว: ถ้าไม่มีรอบใดเลย ชิงอันดับ 3 จะไม่มีคอลัมน์ให้อาศัย */}
+        {rounds.length === 0 && thirdPlace ? (
+          <div className="bracket-tree-col">
             <h3>ชิงอันดับ 3</h3>
             <div className="bracket-tree-col-inner">
               <BracketTreeCard match={thirdPlace} cardRefs={cardRefs} rowRefs={rowRefs} />

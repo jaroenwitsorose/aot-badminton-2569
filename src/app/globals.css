@@ -64,6 +64,19 @@ a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 
+/* ช่องกรอกต้องมีกรอบเสมอ ไม่ว่าจะอยู่ในคลาสไหน
+   เพราะถ้าไม่มีกรอบ คนอ่านไม่รู้ว่าตรงนั้นพิมพ์ได้ (เจอมาแล้วที่หน้าเข้าสู่ระบบผู้ดูแล
+   ซึ่ง input ไม่ได้อยู่ใน .field เลยกลายเป็นเส้นเปล่า ๆ)
+   ใช้ตัวเลือกความจำเพาะต่ำสุด เพื่อให้ .field / .filter-bar / .game-inputs
+   ที่กำหนดขนาดเองไว้แล้วยังคุมทับได้เหมือนเดิม */
+input, select, textarea {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+input[type="checkbox"], input[type="radio"] { border: none; padding: 0; background: none; }
+
 :focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 2px;
@@ -343,8 +356,9 @@ button { cursor: pointer; }
 .bracket-tree-col h3 { margin: 0 0 14px; font-size: 11px; font-weight: 800; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; white-space: nowrap; }
 .bracket-tree-col h3 span { font-weight: 400; text-transform: none; letter-spacing: 0; }
 .bracket-tree-col-inner { display: flex; flex-direction: column; justify-content: space-around; flex: 1; gap: 22px; }
-.bracket-tree-col-third { justify-content: flex-end; }
-.bracket-tree-col-third .bracket-tree-col-inner { flex: none; }
+/* คอลัมน์สุดท้ายมีสองใบซ้อนกัน (ชิงชนะเลิศ แล้วต่อด้วยชิงอันดับ 3)
+   ต้องรวมกลุ่มไว้กลางคอลัมน์ ไม่ใช่กระจายเต็มความสูงแบบรอบอื่น */
+.bracket-tree-col-final .bracket-tree-col-inner { justify-content: center; gap: 26px; }
 .bracket-tree-card { display: block; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 9px; box-shadow: var(--shadow-card); }
 /* หัวข้อบนกล่อง — บอกรอบและประเภท ไม่ให้หลงตอนเลื่อนดูผังที่กว้างกว่าจอ */
 .bracket-tree-head {
@@ -475,7 +489,8 @@ button { cursor: pointer; }
 /* แถวกรอกสกอร์: ชื่อคู่ | ช่องกรอก 3 เกม — ผู้กรอกผลใช้มือถือข้างคอร์ต ต้องไม่ล้นจอ */
 .score-entry-grid { display: grid; grid-template-columns: minmax(150px, 1fr) auto; gap: 8px; align-items: center; }
 .score-input-row { display: flex; gap: 6px; }
-.score-input { width: 58px; text-align: center; }
+/* ช่องแคบ 58px รับ padding แนวนอนของช่องกรอกทั่วไป (12px) ไม่ไหว เลขจะโดนบีบ */
+.score-input { width: 58px; text-align: center; padding: 10px 4px; }
 @media (max-width: 560px) {
   .score-entry-grid { grid-template-columns: minmax(104px, 1fr) auto; gap: 6px; }
   .score-input-row { gap: 4px; }
