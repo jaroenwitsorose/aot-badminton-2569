@@ -39,6 +39,7 @@ export function SiteHeader() {
   }, [isAdmin]);
 
   return (
+    <>
     <header className="site-header">
       <div className="shell header-main">
         <Link href="/" className="brand" aria-label="กลับหน้าแรก">
@@ -56,7 +57,14 @@ export function SiteHeader() {
           {isAdmin ? "กลับหน้าสาธารณะ" : "ผู้ดูแลระบบ"}
         </Link>
       </div>
+    </header>
 
+      {/*
+        แถบเมนูต้องอยู่ "นอก" <header> — position: sticky ถูกจำกัดด้วยกล่องของพ่อแม่เสมอ
+        ถ้าวางไว้ข้างในหัวเว็บซึ่งสูงแค่ราว 125px มันจะค้างได้แค่ในกรอบนั้น
+        พอหัวเว็บเลื่อนพ้นจอ แถบเมนูก็หายตามไปด้วย ไม่ค้างจริง
+        พอย้ายมาเป็นพี่น้องกัน กล่องอ้างอิงจะกลายเป็น <body> ซึ่งสูงเท่าทั้งหน้า
+      */}
       {isAdmin ? null : (
         <>
         <div ref={sentinelRef} className="nav-sentinel" aria-hidden />
@@ -80,6 +88,6 @@ export function SiteHeader() {
         </nav>
         </>
       )}
-    </header>
+    </>
   );
 }

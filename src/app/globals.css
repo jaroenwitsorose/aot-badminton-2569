@@ -107,7 +107,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
  */
 .site-header {
   position: relative; z-index: 40;
-  background: #fff; border-bottom: 1px solid var(--line); box-shadow: var(--shadow-pop);
+  background: #fff; border-bottom: 1px solid var(--line);
 }
 .nav-sentinel { height: 1px; margin-bottom: -1px; }
 .header-main { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 10px; }
@@ -120,10 +120,10 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 .site-nav {
   position: sticky; top: 0; z-index: 41;
-  border-top: 1px solid #edf1f7; background: #fff;
+  background: #fff; border-bottom: 1px solid var(--line);
 }
 /* พอหัวเว็บเลื่อนพ้นจอ ใส่เส้นขอบกับเงาให้แถบเมนู จะได้แยกออกจากเนื้อหาที่ไหลอยู่ข้างใต้ */
-.site-nav.stuck { border-bottom: 1px solid var(--line); box-shadow: var(--shadow-pop); }
+.site-nav.stuck { box-shadow: var(--shadow-pop); }
 .nav-row { display: flex; align-items: center; gap: 14px; }
 .nav-logo {
   flex: none; width: 0; overflow: hidden; opacity: 0;
