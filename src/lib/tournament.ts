@@ -213,24 +213,11 @@ const CATEGORY_LABEL: Record<string, string> = {
 const SNAPSHOT_TTL_MS = 3000;
 let cachedSnapshot: { at: number; promise: Promise<TournamentSnapshot> } | null = null;
 
-/**
- * ชั้นที่สอง: แคชกลางของ Vercel ซึ่งใช้ร่วมกันทุกเครื่อง
- *
- * จำเป็นเพราะเวลามีคนเปิดพร้อมกันเยอะ ๆ Vercel จะกระจายไปหลายเครื่อง
- * แต่ละเครื่องมีหน่วยความจำของตัวเอง แคชในเครื่อง (ชั้นแรก) จึงช่วยได้เฉพาะ
- * คำขอที่ตกมาเครื่องเดียวกัน — ชั้นนี้ทำให้ทุกเครื่องใช้ผลอ่านชุดเดียวกัน
- *
- * snapshot เป็นข้อมูลธรรมดาล้วน (generatedAt เก็บเป็นสตริงอยู่แล้ว) จึงแปลงเก็บได้ปลอดภัย
- */
-const loadSharedSnapshot = unstable_cache(() => getTournamentSnapshot(), ["tournament-snapshot"], {
-  revalidate: SNAPSHOT_TTL_MS / 1000,
-});
-
 export function getCachedTournamentSnapshot(ttlMs = SNAPSHOT_TTL_MS): Promise<TournamentSnapshot> {
   const now = Date.now();
   if (cachedSnapshot && now - cachedSnapshot.at < ttlMs) return cachedSnapshot.promise;
 
-  const promise = loadSharedSnapshot();
+  const promise = buildSnapshot(true);
   cachedSnapshot = { at: now, promise };
   // อย่าเก็บผลที่โหลดพังไว้ให้คนถัดไปเจอซ้ำ — ล้างทิ้งเพื่อให้ลองใหม่ได้ทันที
   promise.catch(() => {
@@ -239,22 +226,85 @@ export function getCachedTournamentSnapshot(ttlMs = SNAPSHOT_TTL_MS): Promise<To
   return promise;
 }
 
-export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
-  const [tournament, days, teams, levels, pairs, matches, ties, draws, lineups, rules, tiebreaks, checklist] =
-    await Promise.all([
-      prisma.tournament.findFirst(),
-      prisma.tournamentDay.findMany({ orderBy: { dayNo: "asc" } }),
-      prisma.team.findMany({ orderBy: { displayOrder: "asc" } }),
-      prisma.level.findMany({ orderBy: { sortOrder: "asc" } }),
-      prisma.pair.findMany({ include: { participants: { orderBy: { playerNo: "asc" } } } }),
-      prisma.match.findMany({ include: { games: true }, orderBy: { matchNo: "asc" } }),
-      prisma.level4Tie.findMany({ orderBy: { tieNo: "asc" } }),
-      prisma.drawAssignment.findMany(),
-      prisma.level4Lineup.findMany(),
-      prisma.colorScoringRule.findMany(),
-      prisma.tiebreakDecision.findMany(),
-      prisma.checklistItem.findMany(),
-    ]);
+/** หน้าผู้ดูแลใช้ตัวนี้ — อ่านสดเสมอ เพื่อให้เห็นผลที่เพิ่งบันทึกทันที */
+export function getTournamentSnapshot(): Promise<TournamentSnapshot> {
+  return buildSnapshot(false);
+}
+
+/**
+ * ตารางที่แทบไม่เปลี่ยนระหว่างวันแข่ง — รายชื่อ สาย กติกาคะแนน ผลจับสลาก
+ *
+ * แยกออกมาเพื่อให้อ่านใหม่นาน ๆ ครั้ง ระหว่างแข่งจริงสิ่งที่เปลี่ยนคือสกอร์เท่านั้น
+ * ไม่มีเหตุให้ดึงรายชื่อนักกีฬา 184 คนใหม่ทุก 3 วินาที
+ *
+ * แปลงค่าวันที่เป็นข้อความตั้งแต่ตรงนี้ เพราะแคชกลางเก็บเป็น JSON —
+ * ถ้าปล่อยเป็น Date ไว้ พอโหลดจากแคชจะกลายเป็นข้อความ แล้ว .toISOString() จะพัง
+ */
+async function loadStaticTables() {
+  const [tournament, days, teams, levels, pairs, ties, rules, tiebreaks, checklist] = await Promise.all([
+    prisma.tournament.findFirst(),
+    prisma.tournamentDay.findMany({ orderBy: { dayNo: "asc" } }),
+    prisma.team.findMany({ orderBy: { displayOrder: "asc" } }),
+    prisma.level.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.pair.findMany({ include: { participants: { orderBy: { playerNo: "asc" } } } }),
+    prisma.level4Tie.findMany({ orderBy: { tieNo: "asc" } }),
+    prisma.colorScoringRule.findMany(),
+    prisma.tiebreakDecision.findMany(),
+    prisma.checklistItem.findMany(),
+  ]);
+
+  const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+  return {
+    tournament: tournament
+      ? { ...tournament, startDate: iso(tournament.startDate), endDate: iso(tournament.endDate) }
+      : null,
+    days: days.map((d) => ({ ...d, actualDate: iso(d.actualDate) })),
+    teams,
+    levels,
+    pairs,
+    ties,
+    rules,
+    tiebreaks,
+    checklist,
+  };
+}
+
+/**
+ * ตารางที่เปลี่ยนระหว่างวันแข่ง — สกอร์ ผลจับสลาก และซองมือทั่วไป
+ *
+ * ผลจับสลากกับซองต้องอยู่กลุ่มนี้ ไม่ใช่กลุ่มนิ่ง เพราะซองของแต่ละคู่สีถูกส่ง
+ * ก่อนลงแข่งจริง ถ้าไปรออ่านใหม่ทุก 60 วินาที ผู้ชมจะเห็นช้ากว่าความจริง
+ * ทั้งสามตารางนี้เล็กมาก (158 + 48 + 30 แถว) อ่านบ่อยจึงไม่เปลืองอะไร
+ */
+async function loadLiveTables() {
+  const [matches, draws, lineups] = await Promise.all([
+    prisma.match.findMany({ include: { games: true }, orderBy: { matchNo: "asc" } }),
+    prisma.drawAssignment.findMany(),
+    prisma.level4Lineup.findMany(),
+  ]);
+  return {
+    matches: matches.map((m) => ({
+      ...m,
+      publicUpdatedAt: m.publicUpdatedAt ? m.publicUpdatedAt.toISOString() : null,
+    })),
+    draws,
+    lineups,
+  };
+}
+
+const STATIC_TTL_S = 60;
+const loadStaticCached = unstable_cache(loadStaticTables, ["tournament-static"], { revalidate: STATIC_TTL_S });
+const loadLiveCached = unstable_cache(loadLiveTables, ["tournament-live"], {
+  revalidate: SNAPSHOT_TTL_MS / 1000,
+});
+
+async function buildSnapshot(useCache: boolean): Promise<TournamentSnapshot> {
+  const [base, live] = await Promise.all([
+    useCache ? loadStaticCached() : loadStaticTables(),
+    useCache ? loadLiveCached() : loadLiveTables(),
+  ]);
+  const { tournament, days, teams, levels, pairs, ties, rules, tiebreaks, checklist } = base;
+  const { matches, draws, lineups } = live;
 
   if (!tournament) throw new Error("ยังไม่ได้นำเข้าข้อมูลตั้งต้น — รัน npm run db:seed ก่อน");
 
@@ -263,7 +313,7 @@ export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
   const dayLabelByNo = new Map(
     days.map((d) => [
       d.dayNo,
-      formatDayLabel(d.labelTemp, d.actualDate ? d.actualDate.toISOString().slice(0, 10) : null),
+      formatDayLabel(d.labelTemp, d.actualDate),
     ]),
   );
 
@@ -440,7 +490,7 @@ export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
       loserPairUid: r.loserPairUid,
       winnerSide: r.winnerSide,
       decided: r.decided,
-      publicUpdatedAt: m.publicUpdatedAt ? m.publicUpdatedAt.toISOString() : null,
+      publicUpdatedAt: m.publicUpdatedAt,
       adminNote: m.adminNote,
       scorable: Boolean(sideA.pair && sideB.pair),
     };
@@ -543,8 +593,8 @@ export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
       titleTh: tournament.titleTh,
       yearBe: tournament.yearBe,
       venue: tournament.venue,
-      startDate: tournament.startDate ? tournament.startDate.toISOString().slice(0, 10) : null,
-      endDate: tournament.endDate ? tournament.endDate.toISOString().slice(0, 10) : null,
+      startDate: tournament.startDate,
+      endDate: tournament.endDate,
       datesConfirmed: Boolean(tournament.startDate && tournament.endDate),
       venueConfirmed: tournament.venueConfirmed && Boolean(tournament.venue),
       publicRefreshMs: tournament.publicRefreshMs,
@@ -556,7 +606,7 @@ export async function getTournamentSnapshot(): Promise<TournamentSnapshot> {
     days: days.map((d) => ({
       dayNo: d.dayNo,
       label: dayLabelByNo.get(d.dayNo) ?? d.labelTemp,
-      actualDate: d.actualDate ? d.actualDate.toISOString().slice(0, 10) : null,
+      actualDate: d.actualDate,
       confirmed: Boolean(d.actualDate),
     })),
     teams: teams.map((t) => ({
