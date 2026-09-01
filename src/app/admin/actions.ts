@@ -27,6 +27,7 @@ import {
 } from "@/lib/auth";
 import { writeAudit, type AuditAction } from "@/lib/audit";
 import { normalizePersonName } from "@/lib/excel/shared";
+import { planRandomDraw, type DrawPair, type DrawPlanItem, type DrawSlot } from "@/lib/draw-planner";
 import { simulateAllResults } from "@/lib/simulator";
 import {
   applyScheduleImport,
@@ -591,6 +592,75 @@ export async function clearDrawAction(input: { token: string }): Promise<ActionR
 
     refreshPublicPages();
     return ok();
+  });
+}
+
+/**
+ * คิดผลจับสลากทั้งระดับให้ครั้งเดียว แต่ยังไม่บันทึก
+ *
+ * แยกจากการบันทึกเพราะหน้าเว็บจะเอาไปหมุนโชว์ทีละช่อง แล้วค่อยสั่งบันทึกตามจังหวะ
+ * คนดูหน้าสาธารณะจึงเห็นผลค่อย ๆ โผล่ตามการหมุนจริง ไม่ใช่โผล่พรวดทีเดียว
+ *
+ * ตัวสุ่มรู้จัก "คน" ไม่ใช่แค่ "คู่" — กันเคสที่เคยเจอตอนตรวจด้วยรายชื่อจริง
+ * คือคนเดียวกันถูกจับไปอยู่กลุ่มเดียวกันจนต้องแข่งกับตัวเอง และถูกจับให้ลงสองคอร์ตพร้อมกัน
+ */
+export async function planRandomDrawAction(input: {
+  levelCode: string;
+}): Promise<ActionResult & { plan?: DrawPlanItem[] }> {
+  return guarded(async () => {
+    await requireRole("ADMIN");
+
+    const [matches, draws, pairs] = await Promise.all([
+      prisma.match.findMany({ orderBy: { matchNo: "asc" } }),
+      prisma.drawAssignment.findMany(),
+      prisma.pair.findMany({ include: { participants: { orderBy: { playerNo: "asc" } } } }),
+    ]);
+
+    // ช่องหนึ่งลงแข่งได้หลายนัด (รอบแบ่งกลุ่มลง 3 นัด) ต้องเก็บเวลาให้ครบทุกนัด
+    // ไม่งั้นกันชนได้แค่นัดแรก
+    const timesByToken = new Map<string, Set<string>>();
+    const startedTokens = new Set<string>();
+    for (const m of matches) {
+      for (const source of [m.sideASource, m.sideBSource]) {
+        if (!source.startsWith("SEED:") && !source.startsWith("GROUP:")) continue;
+        if (!timesByToken.has(source)) timesByToken.set(source, new Set());
+        timesByToken.get(source)!.add(`${m.dayNo}|${m.startTime}`);
+        if (m.status !== "WAITING") startedTokens.add(source);
+      }
+    }
+
+    const levelOf: Record<string, string> = { L1: "LEVEL1", L2: "LEVEL2", L3: "LEVEL3", L4: "LEVEL4" };
+    const allSlots: DrawSlot[] = [...timesByToken.entries()].map(([token, times]) => ({
+      token,
+      levelCode: levelOf[token.split(":")[1]] ?? "",
+      times: [...times],
+    }));
+
+    const assignedTokens = new Set(draws.map((d) => d.token));
+    const target = allSlots.filter(
+      (s) => s.levelCode === input.levelCode && !assignedTokens.has(s.token) && !startedTokens.has(s.token),
+    );
+    if (target.length === 0) return fail("ระดับนี้จับสลากครบแล้ว หรือเริ่มแข่งไปแล้วทุกช่อง");
+
+    const planPairs: DrawPair[] = pairs.map((p) => ({
+      pairUid: p.pairUid,
+      levelCode: p.levelCode,
+      eventType: p.eventType,
+      teamCode: p.teamCode,
+      withdrawn: p.withdrawn,
+      playerKeys: p.participants
+        .map((x) => x.actualName)
+        .filter((n): n is string => Boolean(n))
+        .map(normalizePersonName),
+    }));
+
+    const result = planRandomDraw(
+      target,
+      planPairs,
+      draws.map((d) => ({ token: d.token, pairUid: d.pairUid })),
+    );
+    if (!result.ok) return fail(result.problem ?? "สุ่มไม่สำเร็จ");
+    return { ...ok(), plan: result.plan };
   });
 }
 

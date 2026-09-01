@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { assignDrawAction, clearDrawAction } from "../actions";
+import { DrawLottery } from "./draw-lottery";
 import { EVENT_TH } from "@/lib/labels";
 import { TeamTag } from "@/components/ui";
 
@@ -83,6 +84,15 @@ export function DrawBoard({
         <span style={{ color: "var(--muted)" }}>
           จับสลากแล้ว {assignedCount}/{levelSlots.length} ช่อง
         </span>
+
+        <DrawLottery
+          levelCode={levelCode}
+          levelName={levelsWithSlots.find((l) => l.levelCode === levelCode)?.nameTh ?? ""}
+          remaining={levelSlots.filter((s) => !s.pairUid && !s.started).length}
+          describeToken={describeToken}
+          pairs={pairs.filter((p) => p.levelCode === levelCode && !p.withdrawn)}
+        />
+
         {message ? (
           <span className="ml-auto" style={{ color: message.ok ? "#15803d" : "#b91c1c" }}>
             {message.text}
