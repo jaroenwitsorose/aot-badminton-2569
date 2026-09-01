@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { assignDrawAction, clearDrawAction } from "../actions";
+import { assignDrawAction, clearDrawAction, clearLevelDrawAction } from "../actions";
 import { DrawLottery } from "./draw-lottery";
 import { EVENT_TH } from "@/lib/labels";
 import { TeamTag } from "@/components/ui";
@@ -58,15 +58,26 @@ export function DrawBoard({
     [levelSlots],
   );
 
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
+  const run = (fn: () => Promise<{ ok: boolean; error?: string; message?: string }>) => {
     startTransition(async () => {
       const res = await fn();
-      setMessage(res.ok ? { ok: true, text: "บันทึกแล้ว" } : { ok: false, text: res.error ?? "ผิดพลาด" });
+      setMessage(
+        res.ok
+          ? { ok: true, text: res.message ?? "บันทึกแล้ว" }
+          : { ok: false, text: res.error ?? "ผิดพลาด" },
+      );
       if (res.ok) router.refresh();
     });
   };
 
   const assignedCount = levelSlots.filter((s) => s.pairUid).length;
+
+  /**
+   * ล้างทั้งระดับต้องกดยืนยันอีกครั้ง ไม่ใช่กดทีเดียวหาย
+   * เก็บเป็นสถานะแทนกล่อง confirm ของเบราว์เซอร์ เพื่อให้ข้อความบอกจำนวนช่องได้
+   */
+  const [confirmReset, setConfirmReset] = useState(false);
+  useEffect(() => setConfirmReset(false), [levelCode]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -92,6 +103,32 @@ export function DrawBoard({
           describeToken={describeToken}
           pairs={pairs.filter((p) => p.levelCode === levelCode && !p.withdrawn)}
         />
+
+        {assignedCount > 0 ? (
+          confirmReset ? (
+            <span className="flex items-center gap-2">
+              <span style={{ color: "#b9232e" }}>ล้าง {assignedCount} ช่อง แน่ใจไหม?</span>
+              <button
+                type="button"
+                className="button danger"
+                disabled={pending}
+                onClick={() => {
+                  setConfirmReset(false);
+                  run(() => clearLevelDrawAction({ levelCode }));
+                }}
+              >
+                ล้างเลย
+              </button>
+              <button type="button" className="button ghost" disabled={pending} onClick={() => setConfirmReset(false)}>
+                ยกเลิก
+              </button>
+            </span>
+          ) : (
+            <button type="button" className="button ghost" disabled={pending} onClick={() => setConfirmReset(true)}>
+              ล้างผลจับสลากทั้งระดับ
+            </button>
+          )
+        ) : null}
 
         {message ? (
           <span className="ml-auto" style={{ color: message.ok ? "#15803d" : "#b91c1c" }}>

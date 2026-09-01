@@ -596,6 +596,56 @@ export async function clearDrawAction(input: { token: string }): Promise<ActionR
 }
 
 /**
+ * ล้างผลจับสลากทั้งระดับ เพื่อจับใหม่
+ *
+ * ปลอดภัยกว่าไล่กดล้างทีละช่อง เพราะตรวจก่อนว่ามีช่องไหนเริ่มแข่งไปแล้วหรือยัง
+ * ถ้ามีแม้ช่องเดียวจะไม่ล้างอะไรเลย — ล้างครึ่ง ๆ กลาง ๆ แล้วผลที่กรอกไว้จะไม่ตรงกับคู่
+ */
+export async function clearLevelDrawAction(input: { levelCode: string }): Promise<ActionResult> {
+  return guarded(async () => {
+    const session = await requireRole("ADMIN");
+
+    const assignments = await prisma.drawAssignment.findMany({ where: { levelCode: input.levelCode } });
+    if (assignments.length === 0) return fail("ระดับนี้ยังไม่มีผลจับสลากให้ล้าง");
+
+    const tokens = assignments.map((a) => a.token);
+    const started = await prisma.match.findMany({
+      where: {
+        status: { not: "WAITING" },
+        OR: [{ sideASource: { in: tokens } }, { sideBSource: { in: tokens } }],
+      },
+      select: { matchNo: true },
+      orderBy: { matchNo: "asc" },
+    });
+    if (started.length > 0) {
+      const list = started.slice(0, 5).map((m) => `#${m.matchNo}`).join(", ");
+      return fail(
+        `ล้างไม่ได้ — มีแมตช์ที่เริ่มแข่งไปแล้ว ${started.length} นัด (${list}${started.length > 5 ? "…" : ""}) ต้องล้างผลการแข่งขันก่อน`,
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.drawAssignment.deleteMany({ where: { levelCode: input.levelCode } });
+      await writeAudit(
+        {
+          actorId: session.adminId,
+          action: "DRAW_CLEAR",
+          entityType: "draw_assignment",
+          entityId: input.levelCode,
+          before: { count: assignments.length, tokens },
+          after: { count: 0, scope: "LEVEL" },
+          ...(await meta()),
+        },
+        tx,
+      );
+    });
+
+    refreshPublicPages();
+    return ok(`ล้างผลจับสลาก ${assignments.length} ช่องแล้ว`);
+  });
+}
+
+/**
  * คิดผลจับสลากทั้งระดับให้ครั้งเดียว แต่ยังไม่บันทึก
  *
  * แยกจากการบันทึกเพราะหน้าเว็บจะเอาไปหมุนโชว์ทีละช่อง แล้วค่อยสั่งบันทึกตามจังหวะ
