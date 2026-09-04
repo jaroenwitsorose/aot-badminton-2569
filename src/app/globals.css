@@ -663,3 +663,32 @@ footer.site-footer a { color: #cfe0f4; }
   .lottery-list-slot { width: 96px; }
   .lottery-reel b { font-size: 15px; }
 }
+
+/* ───────── กล่องรายละเอียดคอร์ต (กดจากการ์ดคอร์ตสด) ───────── */
+.court-card.tappable { cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
+.court-card.tappable:hover, .court-card.tappable:focus-visible { background: #ffffff1f; border-color: #ffffff45; }
+.court-tap { font-size: 10px; color: #93a3bd; letter-spacing: 0.04em; margin-top: 2px; }
+
+.court-dialog-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(6, 31, 70, 0.62);
+}
+.court-dialog {
+  width: min(520px, 100%); max-height: 88vh; overflow-y: auto;
+  background: var(--navy); color: #fff; border: 1px solid #ffffff26;
+  border-radius: 20px; padding: 18px;
+  display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+.court-dialog-head { display: flex; justify-content: space-between; align-items: center; }
+.court-dialog-head b { font-size: 17px; }
+.court-dialog-head button { background: none; border: 0; color: #c3cee0; font-size: 18px; padding: 4px 8px; }
+
+/* แต่ละนัดคั่นด้วยเส้น เพื่อไม่ให้อ่านปนกันเวลามีสามนัดเรียงกัน */
+.court-dialog-match { display: flex; flex-direction: column; gap: 8px; }
+.court-dialog-match + .court-dialog-match { border-top: 1px solid #ffffff1f; padding-top: 14px; }
+.court-dialog-link { font-size: 12px; color: var(--gold); text-decoration: underline; align-self: flex-start; }
+
+/* สกอร์รายเกม แสดงต่อท้ายชื่อคู่เมื่อเริ่มกรอกผลแล้ว */
+.court-score { display: block; font-size: 12px; color: #c3cee0; font-variant-numeric: tabular-nums; letter-spacing: 0.08em; margin-top: 2px; }
