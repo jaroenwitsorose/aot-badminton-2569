@@ -252,12 +252,43 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .live-section { background: var(--navy); color: #fff; padding: 26px 0; }
 .inline-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; color: #cbd8e9; font-size: 12px; letter-spacing: 0.12em; font-weight: 800; }
 .inline-heading small { font-weight: 400; letter-spacing: 0; }
+/*
+ * การ์ดคอร์ต — ต้องอ่านออกทั้งบนจอใหญ่ในสนามและบนมือถือ
+ * จอกว้าง 5 คอลัมน์ / จอกลาง 2 คอลัมน์ / มือถือปัดแนวนอนทีละใบ
+ * มือถือไม่เรียงลงล่าง เพราะการ์ดสูงขึ้นมาก 5 ใบซ้อนกันจะดันเนื้อหาอื่นตกจอไปหมด
+ */
 .court-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-.court-card { min-width: 0; padding: 14px; border: 1px solid #ffffff24; border-radius: 14px; background: #ffffff0a; }
-.court-card header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.court-card span { font-size: 10px; color: #aebbd0; letter-spacing: 0.06em; }
-.court-card p { font-size: 12px; line-height: 1.55; margin: 10px 0 0; overflow-wrap: anywhere; }
-.court-card em { font-style: normal; color: var(--gold); }
+.court-card {
+  min-width: 0; padding: 14px; border: 1px solid #ffffff26; border-radius: 14px;
+  background: #ffffff12; display: flex; flex-direction: column; gap: 9px;
+}
+.court-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.court-head b { font-size: 15px; letter-spacing: 0.02em; }
+.court-head span { font-size: 11px; color: #c3cee0; font-variant-numeric: tabular-nums; }
+
+.court-state { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.court-state em { font-style: normal; font-weight: 800; font-size: 12px; color: var(--gold); }
+/* กำลังแข่งอยู่จริงต้องเด่นกว่าคิวที่ยังไม่ถึง */
+.court-state em.now { color: #7ef0a8; }
+.court-state time { font-size: 12px; color: #c3cee0; font-variant-numeric: tabular-nums; }
+
+.court-kind { margin: 0; font-size: 12px; color: #dbe4f1; overflow-wrap: anywhere; }
+
+.court-sides { display: flex; flex-direction: column; gap: 6px; }
+/* แถบสีด้านซ้ายคือสีทีม อ่านออกแม้ยังไม่ทันอ่านชื่อสี */
+.court-side {
+  border-left: 4px solid #ffffff30; padding: 6px 0 6px 9px;
+  background: #ffffff0d; border-radius: 0 8px 8px 0; min-width: 0;
+}
+.court-team { display: block; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; }
+.court-pair { display: block; font-size: 13px; line-height: 1.45; color: #fff; overflow-wrap: anywhere; }
+
+.court-next { list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px dashed #ffffff2e; display: flex; flex-direction: column; gap: 5px; }
+.court-next li { display: flex; gap: 7px; align-items: baseline; font-size: 11px; color: #b8c5da; }
+.court-next time { flex: none; font-weight: 800; color: #dbe4f1; font-variant-numeric: tabular-nums; }
+.court-next-no { flex: none; font-variant-numeric: tabular-nums; }
+.court-next-kind { min-width: 0; overflow-wrap: anywhere; }
+.court-none { margin: 0; font-size: 12px; color: #aebbd0; }
 
 /* ───────────────────────── โครงหน้า ───────────────────────── */
 
@@ -561,7 +592,18 @@ footer.site-footer a { color: #cfe0f4; }
   .metric-grid div { padding: 16px 12px; }
   .metric-grid div:nth-child(2n) { border-right: 0; }
   .metric-grid div:last-child { grid-column: 1 / -1; }
-  .court-grid, .level-grid, .score-grid { grid-template-columns: 1fr; }
+  .level-grid, .score-grid { grid-template-columns: 1fr; }
+  /* การ์ดคอร์ตสูงขึ้นมาก ถ้าเรียงลงล่าง 5 ใบจะดันเนื้อหาอื่นตกจอ
+     จึงให้ปัดแนวนอนแทน โผล่ใบถัดไปนิดหนึ่งเป็นสัญญาณว่ายังมีต่อ */
+  .court-grid {
+    grid-template-columns: none;
+    grid-auto-flow: column; grid-auto-columns: 86%;
+    overflow-x: auto; scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .court-grid::-webkit-scrollbar { display: none; }
+  .court-card { scroll-snap-align: start; }
   .content-section, .page-shell { padding-block: 28px; }
   .panel { padding: 16px; border-radius: 18px; }
   .filter-bar, .filter-bar.four { grid-template-columns: 1fr 1fr; }
